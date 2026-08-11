@@ -54,14 +54,27 @@ local BTN_RIGHT   = MOUSE_BUTTON_INDEX_RIGHT
 -- Cached locals
 local CreateControl              = CreateControl
 local CreateControlFromVirtual   = CreateControlFromVirtual
+local CreateTopLevelWindow       = CreateTopLevelWindow
 local PlaySound                  = PlaySound
 local PlayEmoteByIndex           = PlayEmoteByIndex
+local GetInterfaceColor          = GetInterfaceColor
+local GetString                  = GetString
+local GetUIMousePosition         = GetUIMousePosition
+local GuiRoot                    = GuiRoot
 local ZO_ClearTable              = ZO_ClearTable
+local ZO_ObjectPool              = ZO_ObjectPool
+local ZO_SavedVars               = ZO_SavedVars
+local ZO_SimpleSceneFragment     = ZO_SimpleSceneFragment
+local ZO_CreateStringId          = ZO_CreateStringId
+local ZO_Scroll_Initialize       = ZO_Scroll_Initialize
+local ZO_Scroll_UpdateScrollBar  = ZO_Scroll_UpdateScrollBar
+local ZO_Scroll_ResetToTop       = ZO_Scroll_ResetToTop
 local strformat                  = string.format
 local mmax                       = math.max
 local mmin                       = math.min
 local tinsert                    = table.insert
 local tremove                    = table.remove
+local tsort                      = table.sort
 
 -- Layout constants
 local ROW_W                 = 50
@@ -598,7 +611,7 @@ local function CreateUI()
                 tremove(favs, i)
             end
         end
-        table.sort(favTemp, function(a, b)
+        tsort(favTemp, function(a, b)
             local na = a.displayName or a.emoteSlashName or ""
             local nb = b.displayName or b.emoteSlashName or ""
             return na < nb
@@ -700,7 +713,7 @@ local function CreateUI()
                     end
                 end
             end
-            table.sort(temp, function(a, b)
+            tsort(temp, function(a, b)
                 local na = a.displayName or a.emoteSlashName or ""
                 local nb = b.displayName or b.emoteSlashName or ""
                 return na < nb

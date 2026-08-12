@@ -1,8 +1,8 @@
 local ADDON_TITLE   = "Quick Emote Menu"
 local ADDON_NAME    = "QuickEmoteMenu"
 local ADDON_AUTHOR  = "@AlexD"
-local ADDON_VERSION = "0.0.1" -- TODO: also change in addon file!
-local ADDON_WEBSITE = "https://www.esoui.com/downloads/infoXXXX-QuickEmoteMenu.html" -- TODO: update after upload
+local ADDON_VERSION = "__BUILD_VERSION__"
+local ADDON_WEBSITE = "https://www.esoui.com/downloads/infoXXXX-QuickEmoteMenu.html"
 local SV_VERSION    = 1
 
 local SLASH_COMMAND_PANEL  = "/qempanel"
@@ -1074,6 +1074,8 @@ end
 ----------------------------------------------------------------------
 local function OnLoaded(_, name)
     if name ~= ADDON_NAME then return end
+    EM:UnregisterForEvent(ADDON_NAME, EVENT_ADD_ON_LOADED)
+
     -- Localization
     CacheLocalizedStrings()
 
@@ -1083,7 +1085,6 @@ local function OnLoaded(_, name)
     -- Init
     InitSettings()
     CreateUI()
-    EM:UnregisterForEvent(ADDON_NAME, EVENT_ADD_ON_LOADED)
 end
 
 EM:RegisterForEvent(ADDON_NAME, EVENT_ADD_ON_LOADED, OnLoaded)

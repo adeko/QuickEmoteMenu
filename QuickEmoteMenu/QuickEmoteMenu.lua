@@ -13,6 +13,7 @@ local QEM = QuickEmoteMenu
 -- Cached ESO globals
 local SM  = SCENE_MANAGER
 local EM  = EVENT_MANAGER
+local WM  = WINDOW_MANAGER
 local PEM = PLAYER_EMOTE_MANAGER
 local MIO = MouseIsOver
 
@@ -20,6 +21,10 @@ local SOUND_OPEN  = SOUNDS.TREE_HEADER_CLICK
 local SOUND_CLICK = SOUNDS.DEFAULT_CLICK
 local BTN_LEFT    = MOUSE_BUTTON_INDEX_LEFT
 local BTN_RIGHT   = MOUSE_BUTTON_INDEX_RIGHT
+local CURSOR_TYPE = {
+    DEFAULT = 0,
+    DRAG    = 12
+}
 
 -- Cached locals
 local CreateControl              = CreateControl
@@ -326,6 +331,7 @@ local function CreateUI()
     local function StartDragging()
         if isDragging then return end -- already dragging?
         isDragging = true
+        WM:SetMouseCursor(CURSOR_TYPE.DRAG)
         if QEM.CloseAll then QEM:CloseAll() end
         dragStartMouseX, dragStartMouseY = GetUIMousePosition()
         dragStartLeft, dragStartTop = tlw:GetLeft(), tlw:GetTop()
@@ -335,6 +341,7 @@ local function CreateUI()
     local function StopDragging()
         if not isDragging then return end
         isDragging = false
+        WM:SetMouseCursor(CURSOR_TYPE.DEFAULT)
         EM:UnregisterForUpdate(DRAG_UPDATE_NAME)
         QEM.SV.buttonX = tlw:GetLeft()
         QEM.SV.buttonY = tlw:GetTop()

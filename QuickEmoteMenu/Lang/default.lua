@@ -26,4 +26,7 @@ local strings = {
 • Favorites are saved account-wide]],
 }
 
-QuickEmoteMenu.RegisterStrings(strings, true)
+for stringId, stringValue in pairs(strings) do
+    ZO_CreateStringId(stringId, stringValue)
+    SafeAddVersion(_G[stringId], 1)
+end

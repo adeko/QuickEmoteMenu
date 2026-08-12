@@ -6,6 +6,9 @@
 ## OptionalDependsOn: LibAddonMenu-2.0
 ## SavedVariables: QuickEmoteMenu_SV
 
+Lang/default.lua
+Lang/$(language).lua
+
 QuickEmoteMenu.lua
 Bindings.xml
 

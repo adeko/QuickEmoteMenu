@@ -90,17 +90,20 @@ local TEX = {
 -- Localization
 -- https://wiki.esoui.com/How_to_add_localization_support
 ----------------------------------------------------------------------
-local function RegisterStrings(strings, isDefault)
-    for stringId, stringValue in pairs(strings) do
-        if isDefault then
-            ZO_CreateStringId(stringId, stringValue)
-            SafeAddVersion(_G[stringId], 1)
-        else
-            SafeAddString(_G[stringId], stringValue, 2)
-        end
-    end
+local STRINGS = {}
+
+local function CacheLocalizedStrings()
+    STRINGS.UNKNOWN_NAME         = GetString(SI_QUICKEMOTEMENU_UNKNOWN_NAME)
+    STRINGS.CATEGORIES           = GetString(SI_QUICKEMOTEMENU_CATEGORIES)
+    STRINGS.FAVORITES            = GetString(SI_QUICKEMOTEMENU_FAVORITES)
+    STRINGS.NO_FAVORITES         = GetString(SI_QUICKEMOTEMENU_NO_FAVORITES)
+    STRINGS.BINDING_TOGGLE       = GetString(SI_QUICKEMOTEMENU_BINDING_TOGGLE)
+    STRINGS.OPTION_HOVER         = GetString(SI_QUICKEMOTEMENU_OPTION_HOVER)
+    STRINGS.OPTION_HOVER_TOOLTIP = GetString(SI_QUICKEMOTEMENU_OPTION_HOVER_TOOLTIP)
+    STRINGS.OPTION_CLOSE         = GetString(SI_QUICKEMOTEMENU_OPTION_CLOSE)
+    STRINGS.OPTION_RESET         = GetString(SI_QUICKEMOTEMENU_OPTION_RESET)
+    STRINGS.OPTION_DESCRIPTION   = GetString(SI_QUICKEMOTEMENU_OPTION_DESCRIPTION)
 end
-QEM.RegisterStrings = RegisterStrings
 
 ----------------------------------------------------------------------
 -- Saved Variables + Settings
@@ -134,9 +137,9 @@ local function InitSettings()
     local options = {
         {
             type    = "slider",
-            name    = GetString(SI_QUICKEMOTEMENU_OPTION_HOVER),
-            tooltip = GetString(SI_QUICKEMOTEMENU_OPTION_HOVER_TOOLTIP),
-            warning = GetString(SI_QUICKEMOTEMENU_OPTION_HOVER_TOOLTIP),
+            name    = STRINGS.OPTION_HOVER,
+            tooltip = STRINGS.OPTION_HOVER_TOOLTIP,
+            warning = STRINGS.OPTION_HOVER_TOOLTIP,
             min = 0, max = 200, step = 50,
             getFunc = function() return SV.submenuDelay end,
             setFunc = function(v) SV.submenuDelay = v end,
@@ -144,14 +147,14 @@ local function InitSettings()
         },
         {
             type    = "checkbox",
-            name    = GetString(SI_QUICKEMOTEMENU_OPTION_CLOSE),
+            name    = STRINGS.OPTION_CLOSE,
             getFunc = function() return SV.closeOnPlay end,
             setFunc = function(v) SV.closeOnPlay = v end,
             default = defaults.closeOnPlay,
         },
         {
             type    = "button",
-            name    = GetString(SI_QUICKEMOTEMENU_OPTION_RESET),
+            name    = STRINGS.OPTION_RESET,
             func    = function()
                 SV.buttonX, SV.buttonY = nil, nil
                 if QEM.button then
@@ -162,7 +165,7 @@ local function InitSettings()
         },
         {
             type    = "description",
-            text    = GetString(SI_QUICKEMOTEMENU_OPTION_DESCRIPTION),
+            text    = STRINGS.OPTION_DESCRIPTION,
             width   = "full",
         },
     }
@@ -483,7 +486,7 @@ local function CreateUI()
                 ToggleFavorite(self.data.emoteId)
                 local isFav = IsFavorite(self.data.emoteId)
                 local slash = self.data.emoteSlashName or ""
-                local name  = self.data.displayName or GetString(SI_QUICKEMOTEMENU_UNKNOWN_NAME)
+                local name  = self.data.displayName or STRINGS.UNKNOWN_NAME
                 self.label:SetText(strformat("%s :: %s", name, slash))
                 SetRowFavState(self, isFav)
                 QEM:RefreshMainMenu(true)
@@ -609,9 +612,9 @@ local function CreateUI()
         if #favTemp == 0 then
             local row = favMenu.rowPool:AcquireObject()
             row.data = nil
-            row.label:SetText(GetString(SI_QUICKEMOTEMENU_NO_FAVORITES))
+            row.label:SetText(STRINGS.NO_FAVORITES)
             row:SetHandler("OnMouseUp", function() end)
-            measure:SetText(GetString(SI_QUICKEMOTEMENU_NO_FAVORITES))
+            measure:SetText(STRINGS.NO_FAVORITES)
             maxW = mmax(maxW, measure:GetTextWidth() + ROW_LEFT_PAD + ROW_RIGHT_PAD_EMOTES)
             count = 1
             activeFavRows[1] = row
@@ -620,7 +623,7 @@ local function CreateUI()
                 local row = favMenu.rowPool:AcquireObject()
                 row.data = info
                 local slash = info.emoteSlashName or ""
-                local name  = info.displayName or GetString(SI_QUICKEMOTEMENU_UNKNOWN_NAME)
+                local name  = info.displayName or STRINGS.UNKNOWN_NAME
                 local text  = strformat("%s :: %s", name, slash)
                 row.label:SetText(text)
 
@@ -711,7 +714,7 @@ local function CreateUI()
             local row = emoteMenu.rowPool:AcquireObject()
             row.data = info
             local slash = info.emoteSlashName or ""
-            local name  = info.displayName or GetString(SI_QUICKEMOTEMENU_UNKNOWN_NAME)
+            local name  = info.displayName or STRINGS.UNKNOWN_NAME
             local isFav = IsFavorite(info.emoteId)
             local text  = strformat("%s :: %s", name, slash)
             row.label:SetText(text)
@@ -904,7 +907,7 @@ local function CreateUI()
         do
             local row = CreateMainRow()
             count = count + 1
-            row.label:SetText(GetString(SI_QUICKEMOTEMENU_CATEGORIES))
+            row.label:SetText(STRINGS.CATEGORIES)
             -- row.arrow:SetHidden(false)
             row.arrow:SetAlpha(keepCatSelected and ALPHA_ON or ALPHA_OFF)
             row.data = nil
@@ -933,7 +936,7 @@ local function CreateUI()
                 EM:UnregisterForUpdate("qem_main_cat")
             end)
 
-            measure:SetText(GetString(SI_QUICKEMOTEMENU_CATEGORIES))
+            measure:SetText(STRINGS.CATEGORIES)
             maxW = mmax(maxW, measure:GetTextWidth() + ROW_H * TEXTURE_ARROW_SCALE + 16)
         end
 
@@ -941,7 +944,7 @@ local function CreateUI()
         do
             local row = CreateMainRow()
             count = count + 1
-            row.label:SetText(GetString(SI_QUICKEMOTEMENU_FAVORITES))
+            row.label:SetText(STRINGS.FAVORITES)
             -- row.arrow:SetHidden(false)
             row.arrow:SetAlpha(keepFavSelected and ALPHA_ON or ALPHA_OFF)
             row.data = nil
@@ -970,7 +973,7 @@ local function CreateUI()
                 EM:UnregisterForUpdate("qem_main_fav")
             end)
 
-            measure:SetText(GetString(SI_QUICKEMOTEMENU_FAVORITES))
+            measure:SetText(STRINGS.FAVORITES)
             maxW = mmax(maxW, measure:GetTextWidth() + ROW_H * TEXTURE_ARROW_SCALE + 16)
         end
 
@@ -1065,10 +1068,13 @@ end
 ----------------------------------------------------------------------
 local function OnLoaded(_, name)
     if name ~= ADDON_NAME then return end
+    -- Localization
+    CacheLocalizedStrings()
 
     -- Bindings
-    ZO_CreateStringId("SI_BINDING_NAME_QUICK_EMOTE_MENU", GetString(SI_QUICKEMOTEMENU_BINDING_TOGGLE) .. " " .. ADDON_TITLE)
+    ZO_CreateStringId("SI_BINDING_NAME_QUICK_EMOTE_MENU", STRINGS.BINDING_TOGGLE .. " " .. ADDON_TITLE)
 
+    -- Init
     InitSettings()
     CreateUI()
     EM:UnregisterForEvent(ADDON_NAME, EVENT_ADD_ON_LOADED)

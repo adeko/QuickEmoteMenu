@@ -26,4 +26,6 @@ local strings = {
 • Favoriten werden kontoweit gespeichert]],
 }
 
-QuickEmoteMenu.RegisterStrings(strings, false)
+for stringId, stringValue in pairs(strings) do
+    SafeAddString(_G[stringId], stringValue, 2)
+end

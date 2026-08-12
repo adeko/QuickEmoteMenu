@@ -89,6 +89,8 @@ local TEX = {
 ----------------------------------------------------------------------
 -- Localization
 -- https://wiki.esoui.com/How_to_add_localization_support
+-- dynamically change the language ingame via a slash command in the chat editbox:
+-- /script SetCVar("language.2", "de")
 ----------------------------------------------------------------------
 local STRINGS = {}
 
@@ -267,20 +269,11 @@ local function CreateUI()
     bg:SetEdgeTexture(nil, 1, 1, 1.5, 0)
     bg:SetMouseEnabled(false)            -- must be false so TLW receives drag
 
-    -- TODO: do i still need this?
-    -- Icon (also must not capture mouse)
-    local icon = CreateControl("$(parent)Icon", tlw, CT_TEXTURE)
-    icon:SetAnchor(TOPLEFT, tlw, TOPLEFT, 2, 2)
-    icon:SetAnchor(BOTTOMRIGHT, tlw, BOTTOMRIGHT, -2, -2)
-    icon:SetTexture(TEX.EMOTES)
-    icon:SetMouseEnabled(false)
-
-    -- Actual clickable button (visual only — mouse must stay off so the
-    -- TLW itself receives clicks/drags; textures are swapped manually
-    -- via the `icon` control in the tlw handlers below)
+    -- Clickable button (engine handles normal / pressed / over textures)
     local button = CreateControl("$(parent)Btn", tlw, CT_BUTTON)
     button:SetAnchorFill(tlw)
-    button:SetMouseEnabled(false)
+    button:SetMouseEnabled(true)
+    button:EnableMouseButton(BTN_RIGHT, true)
     button:SetNormalTexture(TEX.EMOTES)
     button:SetPressedTexture(TEX.EMOTES_DOWN)
     button:SetMouseOverTexture(TEX.EMOTES_OVER)
@@ -330,29 +323,18 @@ local function CreateUI()
         QEM.SV.buttonY = tlw:GetTop()
     end
 
-    -- Hover / press visuals / TODO: do we need icon?
-    tlw:SetHandler("OnMouseEnter", function()
-        icon:SetTexture(TEX.EMOTES_OVER)
-    end)
-    tlw:SetHandler("OnMouseExit", function()
-        icon:SetTexture(TEX.EMOTES)
-    end)
-
     -- Left click = toggle menu, Right mouse drag = move button
-    tlw:SetHandler("OnMouseDown", function(self, button)
-        if button == BTN_LEFT then
-            icon:SetTexture(TEX.EMOTES_DOWN)
-        elseif button == BTN_RIGHT then
+    -- (textures are handled automatically by the CT_BUTTON states)
+    button:SetHandler("OnMouseDown", function(self, button)
+        if button == BTN_RIGHT then
             StartDragging()
         end
     end)
-    
-    tlw:SetHandler("OnMouseUp", function(self, button, upInside)
+
+    button:SetHandler("OnMouseUp", function(self, button, upInside)
         if button == BTN_LEFT then
-            icon:SetTexture(TEX.EMOTES)
             if upInside then
                 QEM:ToggleMainMenu()
-                PlaySound(SOUND_CLICK)
             end
         elseif button == BTN_RIGHT then
             StopDragging()
@@ -360,7 +342,7 @@ local function CreateUI()
     end)
 
     QEM.button = tlw          -- store the TLW (for show/hide & position)
-    QEM.buttonClick = button  -- TODO: the actual button
+    QEM.buttonClick = button
 
     -- Anchor submenu to button depending on button position
     local function ShouldOpenSubmenusLeft()

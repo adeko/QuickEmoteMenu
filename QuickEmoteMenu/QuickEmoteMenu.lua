@@ -91,6 +91,23 @@ local TEX = {
 -- https://wiki.esoui.com/How_to_add_localization_support
 -- dynamically change the language ingame via a slash command in the chat editbox:
 -- /script SetCVar("language.2", "de")
+--[[
+Languages:
+de	German
+en	English
+es	Spanish
+fr	French
+ru	Russian
+jp	Japanese
+zh	Chinese Simplified
+br	Portugese
+it	Italian
+kr	Korean
+pl	Polish
+th	Thai
+tr	Turkish
+ua	Ukrainian
+--]]
 ----------------------------------------------------------------------
 local STRINGS = {}
 

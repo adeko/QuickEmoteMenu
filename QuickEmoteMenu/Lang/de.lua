@@ -4,24 +4,24 @@ local strings = {
     SI_QUICKEMOTEMENU_FAVORITES            = "Favoriten",
     SI_QUICKEMOTEMENU_NO_FAVORITES         = "(leer)",
     SI_QUICKEMOTEMENU_BINDING_TOGGLE       = "Umschalten",
-    SI_QUICKEMOTEMENU_OPTION_HOVER         = "Verzögerung für Untermenüs beim Überfahren (ms)",
+    SI_QUICKEMOTEMENU_OPTION_HOVER         = "Untermenü-Hover-Verzögerung (ms)",
     SI_QUICKEMOTEMENU_OPTION_HOVER_TOOLTIP = "0 = nur per Klick öffnen",
-    SI_QUICKEMOTEMENU_OPTION_CLOSE         = "Menü nach dem Abspielen eines Emotes schließen (Linksklick)",
-    SI_QUICKEMOTEMENU_OPTION_RESET         = "Schaltflächenposition zurücksetzen",
+    SI_QUICKEMOTEMENU_OPTION_CLOSE         = "Menü nach Emote schließen (Linksklick)",
+    SI_QUICKEMOTEMENU_OPTION_RESET         = "Button-Position zurücksetzen",
     SI_QUICKEMOTEMENU_OPTION_DESCRIPTION   = [[|c3399FFSTEUERUNG|r
-• Linksklick auf die Schaltfläche öffnet oder schließt das Menü
-• Rechtsklick und Ziehen verschiebt die Schaltfläche
-• Linksklick auf ein Emote spielt es ab
-• Rechtsklick auf ein Emote fügt es zu den Favoriten hinzu oder entfernt es daraus
+• Linksklick auf den Button zum Öffnen/Schließen
+• Rechtsklick und ziehen zum Verschieben
+• Linksklick auf Emote zum Abspielen
+• Rechtsklick auf Emote zu Favoriten hinzufügen/entfernen
 
 |c3399FFMENÜS|r
 • Kategorien — Emotes nach Kategorie durchsuchen
 • Favoriten — schneller Zugriff auf gespeicherte Emotes
-• Untermenüs öffnen sich beim Überfahren oder Klicken (siehe Verzögerungseinstellung)
-• Menüs öffnen sich je nach Schaltflächenposition oberhalb/unterhalb bzw. links/rechts
+• Untermenüs öffnen bei Hover oder Klick (siehe Verzögerung)
+• Menüs öffnen oben/unten und links/rechts je nach Button-Position
 
-|c3399FFTIPS|r
-• Verwende die Tastenbelegung, um das Menü umzuschalten
+|c3399FFTIPPS|r
+• Tastenbelegung zum Umschalten nutzen
 • /qempanel öffnet dieses Einstellungsfenster
 • Favoriten werden kontoweit gespeichert]],
 }

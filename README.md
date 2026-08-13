@@ -4,7 +4,7 @@
 
 An addon for [The Elder Scrolls Online](https://www.elderscrollsonline.com/).
 
-Quick Emote Menu – Fast access to emotes with categories and favorites.
+**Quick Emote Menu – Fast access to emotes with categories and favorites.**
 
 ## Features
 
@@ -18,7 +18,7 @@ Quick Emote Menu – Fast access to emotes with categories and favorites.
 - Optional auto-close after playing an emote
 - Configurable hover delay before submenus open (or open only on click)
 - Button auto-hides with other HUD elements (map, inventory, etc.)
-- Keybind support (Controls → User Interface → Quick Emote Menu)
+- Keybind support (Controls → Quick Emote Menu)
 - Settings via LibAddonMenu-2.0 (`/qempanel`)
 
 ## Optional dependency

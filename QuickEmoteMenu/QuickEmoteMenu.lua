@@ -2,7 +2,7 @@ local ADDON_TITLE   = "Quick Emote Menu"
 local ADDON_NAME    = "QuickEmoteMenu"
 local ADDON_AUTHOR  = "@AlexD"
 local ADDON_VERSION = "__BUILD_VERSION__"
-local ADDON_WEBSITE = "https://www.esoui.com/downloads/infoXXXX-QuickEmoteMenu.html"
+local ADDON_WEBSITE = "https://www.esoui.com/downloads/info4769-QuickEmoteMenu.html"
 local SV_VERSION    = 1
 
 local SLASH_COMMAND_PANEL  = "/qempanel"

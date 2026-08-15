@@ -22,9 +22,9 @@ local SOUND_CLICK = SOUNDS.DEFAULT_CLICK
 local BTN_LEFT    = MOUSE_BUTTON_INDEX_LEFT
 local BTN_RIGHT   = MOUSE_BUTTON_INDEX_RIGHT
 local CURSOR_TYPE = {
-    DEFAULT = 0,
-    DRAG    = 12
-}
+                        DEFAULT = MOUSE_CURSOR_DEFAULT_CURSOR,
+                        DRAG    = MOUSE_CURSOR_PAN,
+                    }
 
 -- Cached locals
 local CreateControl              = CreateControl

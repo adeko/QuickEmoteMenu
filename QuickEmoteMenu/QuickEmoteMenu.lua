@@ -1115,16 +1115,20 @@ local function CreateUI()
     favWindow:SetDrawLayer(DL_OVERLAY)
     favWindow:SetDrawLevel(190)
     favWindow:SetHidden(true)
+    favWindow:SetInheritAlpha(false)
 
+    -- Same backdrop style as CreatePopup / fav submenu
     local favWinBg = CreateControl("$(parent)Bg", favWindow, CT_BACKDROP)
-    favWinBg:SetAnchorFill(favWindow)
+    favWinBg:SetAnchor(TOPLEFT, favWindow, TOPLEFT, -5, -5)
+    favWinBg:SetAnchor(BOTTOMRIGHT, favWindow, BOTTOMRIGHT, 5, 5)
     favWinBg:SetCenterColor(12/255, 12/255, 12/255, BG_ALPHA)
     favWinBg:SetEdgeTexture(nil, 1, 1, 1, 0)
-    favWinBg:SetEdgeColor(0.40, 0.55, 0.70, 1)
+    favWinBg:SetEdgeColor(70/255, 70/255, 70/255, 1)
     favWinBg:SetInsets(-1, -1, 1, 1)
+    favWinBg:SetExcludeFromResizeToFitExtents(true)
     favWinBg:SetMouseEnabled(false)
 
-    -- Header: drag handle + title + close button
+    -- Header: drag handle + title + close button (palette matched to fav submenu)
     local favWinHeader = CreateControl("$(parent)Header", favWindow, CT_BUTTON)
     favWinHeader:SetAnchor(TOPLEFT, favWindow, TOPLEFT, 0, 0)
     favWinHeader:SetAnchor(TOPRIGHT, favWindow, TOPRIGHT, 0, 0)
@@ -1133,27 +1137,21 @@ local function CreateUI()
 
     local favWinHeaderBg = CreateControl("$(parent)Bg", favWinHeader, CT_BACKDROP)
     favWinHeaderBg:SetAnchorFill(favWinHeader)
-    favWinHeaderBg:SetCenterColor(0.40, 0.55, 0.70, 0.35)
+    favWinHeaderBg:SetCenterColor(12/255, 12/255, 12/255, 0.5)
     favWinHeaderBg:SetEdgeTexture(nil, 1, 1, 0, 0)
+    favWinHeaderBg:SetEdgeColor(70/255, 70/255, 70/255, 1)
     favWinHeaderBg:SetMouseEnabled(false)
 
     local favWinTitle = CreateControl("$(parent)Title", favWinHeader, CT_LABEL)
-    favWinTitle:SetAnchor(LEFT, favWinHeader, LEFT, 6, 0)
-    favWinTitle:SetAnchor(RIGHT, favWinHeader, RIGHT, -22, 0)
+    favWinTitle:SetAnchor(LEFT, favWinHeader, LEFT, ROW_LEFT_PAD, 0)
+    favWinTitle:SetAnchor(RIGHT, favWinHeader, RIGHT, -ROW_LEFT_PAD, 0)
+    favWinTitle:SetHorizontalAlignment(TEXT_ALIGN_CENTER)
     favWinTitle:SetMaxLineCount(1)
     favWinTitle:SetWrapMode(TEXT_WRAP_MODE_ELLIPSIS)
     favWinTitle:SetFont(FONT_ROW)
     favWinTitle:SetText(STRINGS.FAVORITES)
     StyleLabel(favWinTitle, false)
-
-    -- Close button (plain textures — no dependency on an unverified virtual template)
-    local favWinClose = CreateControl("$(parent)Close", favWinHeader, CT_BUTTON)
-    favWinClose:SetDimensions(16, 16)
-    favWinClose:SetAnchor(RIGHT, favWinHeader, RIGHT, -3, 0)
-    favWinClose:SetNormalTexture("EsoUI/Art/Buttons/close_up.dds")
-    favWinClose:SetPressedTexture("EsoUI/Art/Buttons/close_down.dds")
-    favWinClose:SetMouseOverTexture("EsoUI/Art/Buttons/close_over.dds")
-    favWinClose:SetClickSound(SOUND_CLICK)
+    favWinTitle:SetMouseEnabled(false)
 
     -- Drag only via the header (built-in TLW move, triggered manually so
     -- clicking rows in the body below never moves the window)
@@ -1205,6 +1203,9 @@ local function CreateUI()
             if not upInside or not self.data or not self.data.emoteIndex then return end
             if btn == BTN_LEFT then
                 PlayEmoteByIndex(self.data.emoteIndex)
+                if QEM.SV.closeOnPlay then
+                    QEM:HideFavoritesWindow(true)
+                end
             end
         end)
         return row
@@ -1265,7 +1266,10 @@ local function CreateUI()
             end
         end
 
-        local finalW = mmax(maxW, ROW_W)
+        -- Header needs room for centered title text; never shrink below that
+        measure:SetText(STRINGS.FAVORITES)
+        local headerMinW = measure:GetTextWidth() + ROW_LEFT_PAD * 2
+        local finalW = mmax(maxW, headerMinW, ROW_W)
         favWindow:SetWidth(finalW)
         favWinScroll:SetWidth(finalW)
         favWinChild:SetWidth(finalW)
@@ -1295,22 +1299,37 @@ local function CreateUI()
     function QEM:ShowFavoritesWindow()
         self:RefreshFavoritesWindow()
         favWindow:SetHidden(false)
+        SM:SetInUIMode(true)
         PlaySound(SOUND_OPEN)
     end
 
-    function QEM:HideFavoritesWindow()
+    function QEM:HideFavoritesWindow(leaveUIMode)
+        if favWindow:IsHidden() then return end
         favWindow:SetHidden(true)
+        if leaveUIMode then
+            LeaveUIMode()
+        end
     end
 
     function QEM:ToggleFavoritesWindow()
         if favWindow:IsHidden() then
             self:ShowFavoritesWindow()
         else
-            self:HideFavoritesWindow()
+            self:HideFavoritesWindow(true)
         end
     end
 
-    favWinClose:SetHandler("OnClicked", function() QEM:HideFavoritesWindow() end)
+    -- Close when leaving UI mode (same behaviour as the main menu)
+    favWindow:SetHandler("OnShow", function(self)
+        self:RegisterForEvent(EVENT_GAME_CAMERA_UI_MODE_CHANGED, function()
+            if not self:IsHidden() and not IsGameCameraUIModeActive() then
+                QEM:HideFavoritesWindow(false)
+            end
+        end)
+    end)
+    favWindow:SetHandler("OnHide", function(self)
+        self:UnregisterForEvent(EVENT_GAME_CAMERA_UI_MODE_CHANGED)
+    end)
 
     -- Position (independent of the main button's saved position)
     favWindow:ClearAnchors()

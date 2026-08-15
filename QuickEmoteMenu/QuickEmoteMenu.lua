@@ -373,7 +373,7 @@ local function CreateUI()
     button:SetHandler("OnMouseUp", function(self, button, upInside)
         if button == BTN_LEFT then
             if upInside then
-                QEM:ToggleMainMenu()
+                QEM:ToggleMainMenu(false)
             end
         elseif button == BTN_RIGHT then
             StopDragging()
@@ -1052,7 +1052,7 @@ local function CreateUI()
         end
     end
 
-    function QEM:ToggleMainMenu()
+    function QEM:ToggleMainMenu(leaveUIModeOnClose)
         if mainMenu:IsHidden() then
             self:RefreshMainMenu()
             AnchorMainMenuToButton()
@@ -1061,7 +1061,9 @@ local function CreateUI()
             PlaySound(SOUND_OPEN)
         else
             self:CloseAll()
-            LeaveUIMode()
+            if leaveUIModeOnClose then
+                LeaveUIMode()
+            end
         end
     end
 
@@ -1074,10 +1076,20 @@ local function CreateUI()
         self:RegisterForEvent(EVENT_ACTION_LAYER_POPPED, function()
             if not self:IsHidden() then QEM:CloseAll() end
         end)
+        -- More reliable than EVENT_ACTION_LAYER_POPPED: fires directly off the
+        -- camera's UI-mode/cursor state, so it closes the menu consistently
+        -- whether it was opened by clicking the button or via the keybind.
+        self:RegisterForEvent(EVENT_GAME_CAMERA_UI_MODE_CHANGED, function()
+            if not self:IsHidden() and not IsGameCameraUIModeActive() then
+                QEM:CloseAll()
+                LeaveUIMode()
+            end
+        end)
     end)
     mainMenu:SetHandler("OnHide", function(self)
         self:UnregisterForEvent(EVENT_GLOBAL_MOUSE_UP)
         self:UnregisterForEvent(EVENT_ACTION_LAYER_POPPED)
+        self:UnregisterForEvent(EVENT_GAME_CAMERA_UI_MODE_CHANGED)
         HideCatMenu()
         HideFavMenu()
     end)
@@ -1096,7 +1108,7 @@ end
 
 -- Keybind handler (bind in Controls → User Interface)
 function QEM_Toggle()
-    if QEM.ToggleMainMenu then QEM:ToggleMainMenu() end
+    if QEM.ToggleMainMenu then QEM:ToggleMainMenu(true) end
 end
 
 ----------------------------------------------------------------------

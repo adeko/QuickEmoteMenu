@@ -10,7 +10,9 @@ An addon for [The Elder Scrolls Online](https://www.elderscrollsonline.com/).
 
 - Movable floating button (right-click + drag to reposition)
 - Main menu with Categories and Favorites
-- Category submenu with all emote categories (game-provided)
+- Categories and emotes are loaded directly from the game's assets 
+- New emotes added by the game will automatically appear in the list
+- Category submenu with all emote categories
 - Emote lists sorted alphabetically, showing both display name and slash command
 - Scrollable lists for long categories / favorites
 - Left-click an emote to play it

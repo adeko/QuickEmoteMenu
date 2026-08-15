@@ -6,7 +6,7 @@ local strings = {
     SI_QUICKEMOTEMENU_BINDING_TOGGLE        = "Umschalten",
     SI_QUICKEMOTEMENU_OPTION_HOVER          = "Untermenü-Hover-Verzögerung (ms)",
     SI_QUICKEMOTEMENU_OPTION_HOVER_TOOLTIP  = "0 = nur per Klick öffnen",
-    SI_QUICKEMOTEMENU_OPTION_UIMODE         = "Nur im UI-Modus anzeigen",
+    SI_QUICKEMOTEMENU_OPTION_UIMODE         = "Button nur im UI-Modus anzeigen",
     SI_QUICKEMOTEMENU_OPTION_UIMODE_TOOLTIP =
     "Zeigt die Hauptschaltfläche nur an, wenn der Mauszeiger aktiv ist (UI-Modus). Sie wird im normalen Spiel-/Interaktionsmodus wieder ausgeblendet.",
     SI_QUICKEMOTEMENU_OPTION_CLOSE          = "Menü nach Emote schließen (Linksklick)",

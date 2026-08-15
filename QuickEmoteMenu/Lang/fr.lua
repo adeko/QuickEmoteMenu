@@ -6,7 +6,7 @@ local strings = {
     SI_QUICKEMOTEMENU_BINDING_TOGGLE        = "Basculer",
     SI_QUICKEMOTEMENU_OPTION_HOVER          = "Délai survol sous-menu (ms)",
     SI_QUICKEMOTEMENU_OPTION_HOVER_TOOLTIP  = "0 = ouvrir uniquement au clic",
-    SI_QUICKEMOTEMENU_OPTION_UIMODE         = "Afficher le bouton en mode UI",
+    SI_QUICKEMOTEMENU_OPTION_UIMODE         = "Afficher le bouton uniquement en mode UI",
     SI_QUICKEMOTEMENU_OPTION_UIMODE_TOOLTIP =
     "Affiche le bouton principal uniquement lorsque le curseur de la souris est actif (mode UI). Il se masque en revenant au mode normal de jeu/interaction.",
     SI_QUICKEMOTEMENU_OPTION_CLOSE          = "Fermer le menu après emote (clic gauche)",

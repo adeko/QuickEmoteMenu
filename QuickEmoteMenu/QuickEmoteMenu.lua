@@ -57,7 +57,7 @@ local ROW_W                 = 50
 local ROW_H                 = 24
 local ALPHA_ON, ALPHA_OFF   = 1, 0.35
 local BG_ALPHA              = 0.85
-local MAX_VISIBLE           = 20     -- TODO: max rows before scrollbar
+local MAX_VISIBLE_ROWS      = 20     -- TODO: max rows before scrollbar
 local TLW_BUTTON_SIZE       = 36
 local TEXTURE_ARROW_SCALE   = 0.8
 local SUBMENU_GAP           = 13
@@ -139,6 +139,8 @@ local function InitSettings()
     local defaults = {
         buttonX             = nil,
         buttonY             = nil,
+        favWindowX          = nil,
+        favWindowY          = nil,
         submenuDelay        = 100,   -- 0 = only on click
         closeOnPlay         = true,  -- leave UI mode after LMB play
         showOnlyInUIMode    = false, -- only show the main button while the cursor is visible
@@ -239,6 +241,9 @@ end
 -- Create UI
 ----------------------------------------------------------------------
 local function CreateUI()
+    -- local saved variables
+    local sv = QEM.SV
+
     -- Permanent measure label
     local measure = CreateControl(ADDON_NAME .. "_Measure", GuiRoot, CT_LABEL)
     measure:SetFont(FONT_ROW)
@@ -317,7 +322,6 @@ local function CreateUI()
     button:SetClickSound(SOUND_CLICK)
 
     -- Position
-    local sv = QEM.SV
     tlw:ClearAnchors()
     if sv.buttonX and sv.buttonY
         and sv.buttonX > 0 and sv.buttonY > 0
@@ -703,7 +707,7 @@ local function CreateUI()
         end
 
         local contentH = mmax(count * ROW_H, 1)
-        local visH     = mmin(mmax(count, 1), MAX_VISIBLE) * ROW_H
+        local visH     = mmin(mmax(count, 1), MAX_VISIBLE_ROWS) * ROW_H
         favChild:SetHeight(contentH)
         favScroll:SetHeight(visH)
         favMenu:SetHeight(visH)
@@ -780,7 +784,7 @@ local function CreateUI()
         end
 
         local contentH = mmax(count * ROW_H, 1)
-        local visH     = mmin(mmax(count, 1), MAX_VISIBLE) * ROW_H
+        local visH     = mmin(mmax(count, 1), MAX_VISIBLE_ROWS) * ROW_H
         emoteChild:SetHeight(contentH)
         emoteScroll:SetHeight(visH)
         emoteMenu:SetHeight(visH)
@@ -1093,6 +1097,233 @@ local function CreateUI()
         HideCatMenu()
         HideFavMenu()
     end)
+
+    ----------------------------------------------------------------------
+    -- Standalone Favorites Window
+    -- Opened only via its own keybind (QEM_ToggleFavoritesWindow). Shows the
+    -- current favorites list, is scrollable, movable by its header, and is
+    -- read-only (no right-click removal here — manage favorites from the
+    -- main button's menu instead).
+    ----------------------------------------------------------------------
+    local FAV_WIN_HEADER_H = 24
+
+    local favWindow = CreateTopLevelWindow(ADDON_NAME .. "_FavWindow")
+    favWindow:SetMouseEnabled(true)
+    favWindow:SetMovable(true)   -- required for StartMoving()/StopMovingOrResizing() below
+    favWindow:SetClampedToScreen(true)
+    favWindow:SetDrawTier(DT_HIGH)
+    favWindow:SetDrawLayer(DL_OVERLAY)
+    favWindow:SetDrawLevel(190)
+    favWindow:SetHidden(true)
+
+    local favWinBg = CreateControl("$(parent)Bg", favWindow, CT_BACKDROP)
+    favWinBg:SetAnchorFill(favWindow)
+    favWinBg:SetCenterColor(12/255, 12/255, 12/255, BG_ALPHA)
+    favWinBg:SetEdgeTexture(nil, 1, 1, 1, 0)
+    favWinBg:SetEdgeColor(0.40, 0.55, 0.70, 1)
+    favWinBg:SetInsets(-1, -1, 1, 1)
+    favWinBg:SetMouseEnabled(false)
+
+    -- Header: drag handle + title + close button
+    local favWinHeader = CreateControl("$(parent)Header", favWindow, CT_BUTTON)
+    favWinHeader:SetAnchor(TOPLEFT, favWindow, TOPLEFT, 0, 0)
+    favWinHeader:SetAnchor(TOPRIGHT, favWindow, TOPRIGHT, 0, 0)
+    favWinHeader:SetHeight(FAV_WIN_HEADER_H)
+    favWinHeader:SetMouseEnabled(true)
+
+    local favWinHeaderBg = CreateControl("$(parent)Bg", favWinHeader, CT_BACKDROP)
+    favWinHeaderBg:SetAnchorFill(favWinHeader)
+    favWinHeaderBg:SetCenterColor(0.40, 0.55, 0.70, 0.35)
+    favWinHeaderBg:SetEdgeTexture(nil, 1, 1, 0, 0)
+    favWinHeaderBg:SetMouseEnabled(false)
+
+    local favWinTitle = CreateControl("$(parent)Title", favWinHeader, CT_LABEL)
+    favWinTitle:SetAnchor(LEFT, favWinHeader, LEFT, 6, 0)
+    favWinTitle:SetAnchor(RIGHT, favWinHeader, RIGHT, -22, 0)
+    favWinTitle:SetMaxLineCount(1)
+    favWinTitle:SetWrapMode(TEXT_WRAP_MODE_ELLIPSIS)
+    favWinTitle:SetFont(FONT_ROW)
+    favWinTitle:SetText(STRINGS.FAVORITES)
+    StyleLabel(favWinTitle, false)
+
+    -- Close button (plain textures — no dependency on an unverified virtual template)
+    local favWinClose = CreateControl("$(parent)Close", favWinHeader, CT_BUTTON)
+    favWinClose:SetDimensions(16, 16)
+    favWinClose:SetAnchor(RIGHT, favWinHeader, RIGHT, -3, 0)
+    favWinClose:SetNormalTexture("EsoUI/Art/Buttons/close_up.dds")
+    favWinClose:SetPressedTexture("EsoUI/Art/Buttons/close_down.dds")
+    favWinClose:SetMouseOverTexture("EsoUI/Art/Buttons/close_over.dds")
+    favWinClose:SetClickSound(SOUND_CLICK)
+
+    -- Drag only via the header (built-in TLW move, triggered manually so
+    -- clicking rows in the body below never moves the window)
+    favWinHeader:SetHandler("OnMouseDown", function(self, btn)
+        if btn == BTN_LEFT then
+            favWindow:StartMoving()
+        end
+    end)
+    favWinHeader:SetHandler("OnMouseUp", function(self, btn)
+        if btn == BTN_LEFT then
+            favWindow:StopMovingOrResizing()
+            QEM.SV.favWindowX = favWindow:GetLeft()
+            QEM.SV.favWindowY = favWindow:GetTop()
+        end
+    end)
+
+    -- Scrollable body
+    local favWinScroll = CreateControlFromVirtual("$(parent)Scroll", favWindow, "ZO_ScrollContainer")
+    favWinScroll:SetAnchor(TOPLEFT, favWinHeader, BOTTOMLEFT, 0, 0)
+    favWinScroll:SetAnchor(BOTTOMRIGHT, favWindow, BOTTOMRIGHT, 0, 0)
+    ZO_Scroll_Initialize(favWinScroll)
+    local favWinChild = favWinScroll:GetNamedChild("ScrollChild")
+    favWinChild:SetResizeToFitDescendents(false)
+
+    local activeFavWinRows = {}
+
+    local function CreateFavWindowRow(pool)
+        local id = pool:GetNextControlId()
+        local row = CreateControl("$(parent)WRow" .. id, favWinChild, CT_BUTTON)
+        row:SetMouseEnabled(true)
+        row:SetDimensions(ROW_W, ROW_H)
+        row:SetHidden(true)
+
+        local label = CreateControl("$(parent)Label", row, CT_LABEL)
+        label:SetAnchor(LEFT, row, LEFT, ROW_LEFT_PAD, 0)
+        label:SetAnchor(RIGHT, row, RIGHT, -ROW_RIGHT_PAD, 0)
+        label:SetMaxLineCount(1)
+        label:SetWrapMode(TEXT_WRAP_MODE_ELLIPSIS)
+        label:SetFont(FONT_ROW)
+        StyleLabel(label, false)
+        row.label = label
+
+        row:SetHandler("OnMouseEnter", function(self) StyleLabel(self.label, true) end)
+        row:SetHandler("OnMouseExit",  function(self) StyleLabel(self.label, false) end)
+
+        -- Left-click plays the emote. No right-click handler on purpose —
+        -- this window is read-only; favorites are managed from the main menu.
+        row:SetHandler("OnMouseUp", function(self, btn, upInside)
+            if not upInside or not self.data or not self.data.emoteIndex then return end
+            if btn == BTN_LEFT then
+                PlayEmoteByIndex(self.data.emoteIndex)
+            end
+        end)
+        return row
+    end
+
+    local function ResetFavWindowRow(c)
+        c:SetHidden(true)
+        c:ClearAnchors()
+        c.data = nil
+    end
+
+    favWindow.rowPool = ZO_ObjectPool:New(CreateFavWindowRow, ResetFavWindowRow)
+
+    function QEM:RefreshFavoritesWindow()
+        favWindow.rowPool:ReleaseAllObjects()
+        ZO_ClearTable(activeFavWinRows)
+
+        local favs = QEM.SV.favorites
+        local favTemp = {}
+        for i = #favs, 1, -1 do
+            local emoteId = favs[i]
+            local info = PEM:GetEmoteItemInfo(emoteId)
+            if info and info.emoteIndex then
+                tinsert(favTemp, info)
+            else
+                tremove(favs, i)
+            end
+        end
+        tsort(favTemp, function(a, b)
+            local na = a.displayName or a.emoteSlashName or ""
+            local nb = b.displayName or b.emoteSlashName or ""
+            return na < nb
+        end)
+
+        local maxW = 0
+        local count = 0
+
+        if #favTemp == 0 then
+            local row = favWindow.rowPool:AcquireObject()
+            row.data = nil
+            row.label:SetText(STRINGS.NO_FAVORITES)
+            measure:SetText(STRINGS.NO_FAVORITES)
+            maxW = mmax(maxW, measure:GetTextWidth() + ROW_LEFT_PAD + ROW_RIGHT_PAD_EMOTES)
+            count = 1
+            activeFavWinRows[1] = row
+        else
+            for _, info in ipairs(favTemp) do
+                local row = favWindow.rowPool:AcquireObject()
+                row.data = info
+                local slash = info.emoteSlashName or ""
+                local name  = info.displayName or STRINGS.UNKNOWN_NAME
+                local text  = strformat("%s :: %s", name, slash)
+                row.label:SetText(text)
+                measure:SetText(text)
+                maxW = mmax(maxW, measure:GetTextWidth() + ROW_LEFT_PAD + ROW_RIGHT_PAD_EMOTES)
+                count = count + 1
+                activeFavWinRows[count] = row
+            end
+        end
+
+        local finalW = mmax(maxW, ROW_W)
+        favWindow:SetWidth(finalW)
+        favWinScroll:SetWidth(finalW)
+        favWinChild:SetWidth(finalW)
+
+        for i = 1, count do
+            local row = activeFavWinRows[i]
+            row:ClearAnchors()
+            row:SetDimensions(finalW, ROW_H)
+            row:SetHidden(false)
+            if i == 1 then
+                row:SetAnchor(TOPLEFT, favWinChild, TOPLEFT, 0, 0)
+            else
+                row:SetAnchor(TOPLEFT, activeFavWinRows[i - 1], BOTTOMLEFT, 0, 0)
+            end
+        end
+
+        local contentH = mmax(count * ROW_H, 1)
+        local visH     = mmin(mmax(count, 1), MAX_VISIBLE_ROWS) * ROW_H
+        favWinChild:SetHeight(contentH)
+        favWinScroll:SetHeight(visH)
+        favWindow:SetHeight(visH + FAV_WIN_HEADER_H)
+
+        if ZO_Scroll_UpdateScrollBar then ZO_Scroll_UpdateScrollBar(favWinScroll) end
+        if ZO_Scroll_ResetToTop then ZO_Scroll_ResetToTop(favWinScroll) end
+    end
+
+    function QEM:ShowFavoritesWindow()
+        self:RefreshFavoritesWindow()
+        favWindow:SetHidden(false)
+        PlaySound(SOUND_OPEN)
+    end
+
+    function QEM:HideFavoritesWindow()
+        favWindow:SetHidden(true)
+    end
+
+    function QEM:ToggleFavoritesWindow()
+        if favWindow:IsHidden() then
+            self:ShowFavoritesWindow()
+        else
+            self:HideFavoritesWindow()
+        end
+    end
+
+    favWinClose:SetHandler("OnClicked", function() QEM:HideFavoritesWindow() end)
+
+    -- Position (independent of the main button's saved position)
+    favWindow:ClearAnchors()
+    if sv.favWindowX and sv.favWindowY
+        and sv.favWindowX > 0 and sv.favWindowY > 0
+        and sv.favWindowX < GuiRoot:GetWidth()
+        and sv.favWindowY < GuiRoot:GetHeight() then
+        favWindow:SetAnchor(TOPLEFT, GuiRoot, TOPLEFT, sv.favWindowX, sv.favWindowY)
+    else
+        favWindow:SetAnchor(TOPLEFT, GuiRoot, CENTER, 50, 0) -- default position
+    end
+
+    QEM.favWindow = favWindow
 end
 
 ----------------------------------------------------------------------
@@ -1111,6 +1342,11 @@ function QEM_Toggle()
     if QEM.ToggleMainMenu then QEM:ToggleMainMenu(true) end
 end
 
+-- Keybind handler for the standalone favorites window
+function QEM_ToggleFavoritesWindow()
+    if QEM.ToggleFavoritesWindow then QEM:ToggleFavoritesWindow() end
+end
+
 ----------------------------------------------------------------------
 -- Load
 ----------------------------------------------------------------------
@@ -1123,6 +1359,7 @@ local function OnLoaded(_, name)
 
     -- Bindings
     ZO_CreateStringId("SI_BINDING_NAME_QUICK_EMOTE_MENU", STRINGS.BINDING_TOGGLE .. " " .. ADDON_TITLE)
+    ZO_CreateStringId("SI_BINDING_NAME_QUICK_EMOTE_MENU_FAVORITES", STRINGS.BINDING_TOGGLE .. " " .. STRINGS.FAVORITES .. " " .. ADDON_TITLE)
 
     -- Init
     InitSettings()

@@ -1324,7 +1324,31 @@ local function CreateUI()
         end
     end
 
-    -- Close when leaving UI mode (same behaviour as the main menu)
+    -- Force-close the temporary favorites window as soon as the HUD scenes
+    -- start hiding (map, inventory, dialogues, etc.). This is the reliable
+    -- way for popup windows — no fragment that can re-show them later.
+    local function ForceHideFavOnHudHide(oldState, newState)
+        if newState == SCENE_HIDING or newState == SCENE_HIDDEN then
+            if not favWindow:IsHidden() then
+                QEM:HideFavoritesWindow(false)
+            end
+        end
+    end
+    SM:GetScene("hud"):RegisterCallback("StateChange", ForceHideFavOnHudHide)
+    SM:GetScene("hudui"):RegisterCallback("StateChange", ForceHideFavOnHudHide)
+
+    -- Extra safety for the world map specifically
+    if WORLD_MAP_SCENE then
+        WORLD_MAP_SCENE:RegisterCallback("StateChange", function(oldState, newState)
+            if newState == SCENE_SHOWING or newState == SCENE_SHOWN then
+                if not favWindow:IsHidden() then
+                    QEM:HideFavoritesWindow(false)
+                end
+            end
+        end)
+    end
+
+    -- Also close when leaving UI mode / cursor (movement, etc.)
     favWindow:SetHandler("OnShow", function(self)
         self:RegisterForEvent(EVENT_GAME_CAMERA_UI_MODE_CHANGED, function()
             if not self:IsHidden() and not IsGameCameraUIModeActive() then

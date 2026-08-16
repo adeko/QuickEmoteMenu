@@ -9,6 +9,12 @@ local strings = {
     SI_QUICKEMOTEMENU_OPTION_UIMODE         = "Düğmeyi yalnızca UI modunda göster",
     SI_QUICKEMOTEMENU_OPTION_UIMODE_TOOLTIP =
     "Ana düğmeyi yalnızca fare imleci etkinken (UI modu) gösterir. Normal oyun/etkileşim moduna döndüğünüzde gizlenir.",
+    SI_QUICKEMOTEMENU_OPTION_DETACH         = "Düğmeyi Sohbetten Ayır",
+    SI_QUICKEMOTEMENU_OPTION_DETACH_TOOLTIP = "Düğmeyi sohbet penceresinin dışına taşır. Düğme serbestçe sürüklenebilir.",
+    SI_QUICKEMOTEMENU_OPTION_SETTINGS       = "Ayarlar",
+    SI_QUICKEMOTEMENU_OPTION_ATTACH_BUTTON  = "Düğmeyi Sabitle",
+    SI_QUICKEMOTEMENU_OPTION_DETACH_BUTTON  = "Düğmeyi Ayır",
+    SI_QUICKEMOTEMENU_OPTION_SHOW_PANEL     = "Ayar Panelini Göster",
     SI_QUICKEMOTEMENU_OPTION_CLOSE          = "Emote sonrası menüyü kapat (sol tık)",
     SI_QUICKEMOTEMENU_OPTION_RESET          = "Düğme konumunu sıfırla",
     SI_QUICKEMOTEMENU_OPTION_DESCRIPTION    = [[

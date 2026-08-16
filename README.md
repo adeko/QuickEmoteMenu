@@ -8,20 +8,21 @@ An addon for [The Elder Scrolls Online](https://www.elderscrollsonline.com/).
 
 ## Features
 
-- Movable floating button (right-click + drag to reposition)
-- Main menu with Categories and Favorites
-- Categories and emotes are loaded directly from the game's assets 
+- Button attaches to the chat window by default (blends in, hides/fades with chat) — or detach it to a free-floating, draggable button
+- Main menu with Categories, Favorites, and Settings
+- Categories and emotes are loaded directly from the game's assets
 - New emotes added by the game will automatically appear in the list
 - Category submenu with all emote categories
 - Emote lists sorted alphabetically, showing both display name and slash command
 - Scrollable lists for long categories / favorites
 - Left-click an emote to play it
 - Right-click an emote to add/remove from Favorites (favorites are highlighted)
+- Standalone, movable Favorites window for quick access via its own keybind
 - Optional auto-close after playing an emote
 - Configurable hover delay before submenus open (or open only on click)
 - Button auto-hides with other HUD elements (map, inventory, etc.)
-- Keybind support (Controls → Quick Emote Menu)
-- Settings via LibAddonMenu-2.0 (`/qempanel`)
+- Keybind support (Controls → Quick Emote Menu) for the main menu and the Favorites window
+- Settings via LibAddonMenu-2.0 (`/qempanel`), or toggle Attach/Detach directly with `/qemdetach`
 
 ## Optional dependency
 
@@ -29,7 +30,7 @@ An addon for [The Elder Scrolls Online](https://www.elderscrollsonline.com/).
 
 ## Credits / Inspiration
 
-Idea and concept inspired by the outdated [QuickEmotes](https://www.esoui.com/downloads/info2348-QuickEmotes.html) addon by KLISK.  
+Idea and concept inspired by the outdated [QuickEmotes](https://www.esoui.com/downloads/info2348-QuickEmotes.html) addon by KLISK.
 This is a new implementation written from scratch.
 
 If you notice any bugs or translations that sound unnatural in your native language, please let me know so they can be improved.

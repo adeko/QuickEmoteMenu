@@ -1057,6 +1057,7 @@ local function CreateUI()
 
     function QEM:ToggleMainMenu(leaveUIModeOnClose)
         if mainMenu:IsHidden() then
+            if self.HideFavoritesWindow then self:HideFavoritesWindow(false) end
             self:RefreshMainMenu()
             AnchorMainMenuToButton()
             mainMenu:SetHidden(false)
@@ -1107,7 +1108,8 @@ local function CreateUI()
     -- Layout matches the fav submenu: explicit width/height, no padding
     -- inset that fights scroll anchors, same backdrop style as CreatePopup.
     ----------------------------------------------------------------------
-    local FAV_WIN_HEADER_H = ROW_H
+    local FAV_WIN_HEADER_MARGIN = 5
+    local FAV_WIN_HEADER_H = ROW_H + FAV_WIN_HEADER_MARGIN
 
     local favWindow = CreateTopLevelWindow(ADDON_NAME .. "_FavWindow")
     favWindow:SetMouseEnabled(true)
@@ -1135,7 +1137,7 @@ local function CreateUI()
     local favWinHeader = CreateControl("$(parent)Header", favWindow, CT_CONTROL)
     favWinHeader:SetAnchor(TOPLEFT, favWindow, TOPLEFT, 0, 0)
     favWinHeader:SetAnchor(TOPRIGHT, favWindow, TOPRIGHT, 0, 0)
-    favWinHeader:SetHeight(FAV_WIN_HEADER_H)
+    favWinHeader:SetHeight(FAV_WIN_HEADER_H - FAV_WIN_HEADER_MARGIN)
     favWinHeader:SetMouseEnabled(true)
 
     local favWinHeaderBg = CreateControl("$(parent)Bg", favWinHeader, CT_BACKDROP)
@@ -1172,7 +1174,7 @@ local function CreateUI()
 
     -- Scrollable body — same pattern as favMenu / emoteMenu
     local favWinScroll = CreateControlFromVirtual("$(parent)Scroll", favWindow, "ZO_ScrollContainer")
-    favWinScroll:SetAnchor(TOPLEFT, favWindow, TOPLEFT, 0, FAV_WIN_HEADER_H + 5)
+    favWinScroll:SetAnchor(TOPLEFT, favWindow, TOPLEFT, 0, FAV_WIN_HEADER_H)
     favWinScroll:SetAnchor(BOTTOMRIGHT, favWindow, BOTTOMRIGHT, 0, 0)
     ZO_Scroll_Initialize(favWinScroll)
     local favWinChild = favWinScroll:GetNamedChild("ScrollChild")
@@ -1299,6 +1301,7 @@ local function CreateUI()
     end
 
     function QEM:ShowFavoritesWindow()
+        if self.CloseAll then self:CloseAll() end
         self:RefreshFavoritesWindow()
         favWindow:SetHidden(false)
         SM:SetInUIMode(true)

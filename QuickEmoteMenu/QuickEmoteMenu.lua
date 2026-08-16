@@ -6,6 +6,10 @@ local ADDON_WEBSITE = "https://www.esoui.com/downloads/info4769-QuickEmoteMenu.h
 local SV_VERSION    = 1
 
 local SLASH_COMMAND_PANEL  = "/qempanel"
+local SLASH_COMMAND_DETACH = "/qemdetach"
+
+-- TODO: when true, the in-menu Settings entry is not shown on the main emote menu.
+local hideSettingsMenu = false
 
 QuickEmoteMenu = QuickEmoteMenu or {}
 local QEM = QuickEmoteMenu
@@ -138,6 +142,29 @@ local function CacheLocalizedStrings()
     STRINGS.OPTION_CLOSE           = GetString(SI_QUICKEMOTEMENU_OPTION_CLOSE)
     STRINGS.OPTION_RESET           = GetString(SI_QUICKEMOTEMENU_OPTION_RESET)
     STRINGS.OPTION_DESCRIPTION     = GetString(SI_QUICKEMOTEMENU_OPTION_DESCRIPTION)
+    STRINGS.SETTINGS               = GetString(SI_QUICKEMOTEMENU_OPTION_SETTINGS)
+    STRINGS.ATTACH_BUTTON          = GetString(SI_QUICKEMOTEMENU_OPTION_ATTACH_BUTTON)
+    STRINGS.DETACH_BUTTON          = GetString(SI_QUICKEMOTEMENU_OPTION_DETACH_BUTTON)
+    STRINGS.SHOW_SETTINGS_PANEL    = GetString(SI_QUICKEMOTEMENU_OPTION_SHOW_PANEL)
+end
+
+----------------------------------------------------------------------
+-- Shared helpers (slash commands + in-menu Settings)
+----------------------------------------------------------------------
+function QEM.OpenSettingsPanel()
+    if LibAddonMenu2 then
+        LibAddonMenu2:OpenToPanel(ADDON_NAME .. "Panel")
+    else
+        d("[" .. ADDON_NAME .. "] LibAddonMenu-2.0 not found. Settings unavailable.")
+    end
+end
+
+function QEM.ToggleDetachFromChat()
+    if not QEM.SV then return end
+    QEM.SV.detachButtonFromChat = not QEM.SV.detachButtonFromChat
+    if QEM.UpdateButtonAttachment then
+        QEM.UpdateButtonAttachment()
+    end
 end
 
 ----------------------------------------------------------------------
@@ -212,7 +239,7 @@ local function InitSettings()
                 if QEM.UpdateButtonAttachment then QEM.UpdateButtonAttachment() end
             end,
             default = defaults.detachButtonFromChat,
-        },
+        }, -- toggle also available via /qemdetach and the in-menu Settings entry
         {
             type    = "button",
             name    = STRINGS.OPTION_RESET,
@@ -551,6 +578,11 @@ local function CreateUI()
     favChild:SetResizeToFitDescendents(false)
     favMenu.scrollChild = favChild
 
+    -- Settings submenu (Attach/Detach + open LAM panel) ----------------
+    local settingsMenu = CreatePopup(ADDON_NAME .. "_SettingsMenu", mainMenu.bg)
+    QEM.settingsMenu = settingsMenu
+
+    local settingsRows = {}
     local activeEmoteRows = {}
     local activeFavRows = {}
     local seenSlash = {}
@@ -705,6 +737,14 @@ local function CreateUI()
         mainMenu.selectedFavRow = nil
     end
 
+    local function HideSettingsMenu()
+        settingsMenu:SetHidden(true)
+        if mainMenu.selectedSettingsRow and mainMenu.selectedSettingsRow.arrow then
+            mainMenu.selectedSettingsRow.arrow:SetAlpha(ALPHA_OFF)
+        end
+        mainMenu.selectedSettingsRow = nil
+    end
+
     local function HideCatMenu()
         catMenu:SetHidden(true)
         HideEmoteMenu()
@@ -716,6 +756,7 @@ local function CreateUI()
 
     function QEM.ShowFavorites(anchorRow)
         HideCatMenu()
+        HideSettingsMenu()
         AnchorSubmenu(favMenu, anchorRow)
         favMenu.rowPool:ReleaseAllObjects()
         ZO_ClearTable(activeFavRows)
@@ -812,6 +853,7 @@ local function CreateUI()
 
     local function ShowEmotesForCategory(category, anchorRow)
         HideFavMenu()
+        HideSettingsMenu()
         HideEmoteMenu()
         selectedCategoryRow = anchorRow
         if anchorRow.arrow then anchorRow.arrow:SetAlpha(ALPHA_ON) end
@@ -1007,6 +1049,7 @@ local function CreateUI()
 
     local function OpenCategoriesMenu(row)
         HideFavMenu()
+        HideSettingsMenu()
         AnchorSubmenu(catMenu, row)
         catMenu:SetHidden(false)
         row.arrow:SetAlpha(ALPHA_ON)
@@ -1016,19 +1059,118 @@ local function CreateUI()
 
     local function OpenFavoritesMenu(row)
         HideCatMenu()
+        HideSettingsMenu()
         mainMenu.selectedFavRow = row
         row.arrow:SetAlpha(ALPHA_ON)
         QEM.ShowFavorites(row)
     end
 
+    local function BuildSettingsMenu()
+        -- Rebuild fixed rows so Attach/Detach label matches current state
+        for _, r in ipairs(settingsRows) do
+            r:SetHidden(true)
+            r:ClearAnchors()
+        end
+        ZO_ClearTable(settingsRows)
+
+        local function CreateSettingsRow()
+            local idx = #settingsRows + 1
+            local row = settingsMenu["srow" .. idx]
+            if not row then
+                row = CreateControl("$(parent)SRow" .. idx, settingsMenu, CT_BUTTON)
+                row:SetMouseEnabled(true)
+                row:SetDimensions(ROW_W, ROW_H)
+                local label = CreateControl("$(parent)Label", row, CT_LABEL)
+                label:SetAnchor(LEFT, row, LEFT, ROW_LEFT_PAD, 0)
+                label:SetAnchor(RIGHT, row, RIGHT, -ROW_RIGHT_PAD, 0)
+                label:SetMaxLineCount(1)
+                label:SetWrapMode(TEXT_WRAP_MODE_ELLIPSIS)
+                label:SetFont(FONT_ROW)
+                StyleLabel(label, false)
+                row.label = label
+                row:SetHandler("OnMouseEnter", function(self) StyleLabel(self.label, true) end)
+                row:SetHandler("OnMouseExit",  function(self) StyleLabel(self.label, false) end)
+                settingsMenu["srow" .. idx] = row
+            end
+            settingsRows[idx] = row
+            return row
+        end
+
+        local maxW = ROW_W
+        local count = 0
+
+        -- 1. Attach / Detach Button
+        do
+            local row = CreateSettingsRow()
+            count = count + 1
+            local text = QEM.SV.detachButtonFromChat and STRINGS.ATTACH_BUTTON or STRINGS.DETACH_BUTTON
+            row.label:SetText(text)
+            row:SetHandler("OnMouseUp", function(self, btn, upInside)
+                if btn == BTN_LEFT and upInside then
+                    QEM.ToggleDetachFromChat()
+                    -- Rebuild so the Attach/Detach label reflects the new state
+                    if mainMenu.selectedSettingsRow then
+                        BuildSettingsMenu()
+                    end
+                end
+            end)
+            measure:SetText(text)
+            maxW = mmax(maxW, measure:GetTextWidth() + ROW_LEFT_PAD + ROW_RIGHT_PAD + 8)
+        end
+
+        -- 2. Show Settings Panel (only if LibAddonMenu2 is available)
+        if LibAddonMenu2 then
+            local row = CreateSettingsRow()
+            count = count + 1
+            row.label:SetText(STRINGS.SHOW_SETTINGS_PANEL)
+            row:SetHandler("OnMouseUp", function(self, btn, upInside)
+                if btn == BTN_LEFT and upInside then
+                    QEM:CloseAll()
+                    -- QEM.OpenSettingsPanel() -- This doesn't work! use the slash command
+                    SLASH_COMMANDS[SLASH_COMMAND_PANEL]()
+                end
+            end)
+            measure:SetText(STRINGS.SHOW_SETTINGS_PANEL)
+            maxW = mmax(maxW, measure:GetTextWidth() + ROW_LEFT_PAD + ROW_RIGHT_PAD + 8)
+        end
+
+        local finalW = mmax(maxW, ROW_W)
+        for i = 1, count do
+            local row = settingsRows[i]
+            row:ClearAnchors()
+            row:SetDimensions(finalW, ROW_H)
+            row:SetHidden(false)
+            if i == 1 then
+                row:SetAnchor(TOPLEFT, settingsMenu, TOPLEFT, 0, 0)
+            else
+                row:SetAnchor(TOPLEFT, settingsRows[i - 1], BOTTOMLEFT, 0, 0)
+            end
+        end
+        settingsMenu:SetWidth(finalW)
+        settingsMenu:SetHeight(mmax(count, 1) * ROW_H)
+    end
+
+    local function OpenSettingsMenu(row)
+        HideCatMenu()
+        HideFavMenu()
+        BuildSettingsMenu()
+        AnchorSubmenu(settingsMenu, row)
+        settingsMenu:SetHidden(false)
+        row.arrow:SetAlpha(ALPHA_ON)
+        mainMenu.selectedSettingsRow = row
+        PlaySound(SOUND_OPEN)
+    end
+
     function QEM:RefreshMainMenu(keepSubmenuOpen)
         local keepCatSelected = keepSubmenuOpen and mainMenu.selectedCatRow ~= nil
         local keepFavSelected = keepSubmenuOpen and mainMenu.selectedFavRow ~= nil
+        local keepSettingsSelected = keepSubmenuOpen and mainMenu.selectedSettingsRow ~= nil
 
         ClearMainRows()
         if not keepSubmenuOpen then
             HideCatMenu()
             HideFavMenu()
+            HideSettingsMenu()
         end
 
         local maxW = ROW_W
@@ -1108,6 +1250,42 @@ local function CreateUI()
             maxW = mmax(maxW, measure:GetTextWidth() + ROW_H * TEXTURE_ARROW_SCALE + 16)
         end
 
+        -- Settings (same look; optional via hideSettingsMenu)
+        if not hideSettingsMenu then
+            local row = CreateMainRow()
+            count = count + 1
+            row.label:SetText(STRINGS.SETTINGS)
+            row.arrow:SetAlpha(keepSettingsSelected and ALPHA_ON or ALPHA_OFF)
+            row.data = nil
+            if keepSettingsSelected then
+                mainMenu.selectedSettingsRow = row
+            end
+
+            row:SetHandler("OnMouseUp", function(self, btn, upInside)
+                if btn == BTN_LEFT and upInside then
+                    OpenSettingsMenu(self)
+                end
+            end)
+            row:SetHandler("OnMouseEnter", function(self)
+                StyleLabel(self.label, true)
+                if QEM.SV.submenuDelay > 0 then
+                    EM:RegisterForUpdate("qem_main_settings", QEM.SV.submenuDelay, function()
+                        EM:UnregisterForUpdate("qem_main_settings")
+                        if MIO(self) then
+                            OpenSettingsMenu(self)
+                        end
+                    end)
+                end
+            end)
+            row:SetHandler("OnMouseExit", function(self)
+                StyleLabel(self.label, false)
+                EM:UnregisterForUpdate("qem_main_settings")
+            end)
+
+            measure:SetText(STRINGS.SETTINGS)
+            maxW = mmax(maxW, measure:GetTextWidth() + ROW_H * TEXTURE_ARROW_SCALE + 16)
+        end
+
         local finalW = mmax(maxW, ROW_W)
 
         for i = 1, count do
@@ -1130,6 +1308,7 @@ local function CreateUI()
         mainMenu:SetHidden(true)
         HideCatMenu()
         HideFavMenu()
+        HideSettingsMenu()
     end
 
     -- Anchor main menu to button depending on button position. Uses `button`
@@ -1168,7 +1347,7 @@ local function CreateUI()
     -- Close when clicking outside
     mainMenu:SetHandler("OnShow", function(self)
         self:RegisterForEvent(EVENT_GLOBAL_MOUSE_UP, function()
-            if MIO(self) or MIO(button) or MIO(catMenu) or MIO(emoteMenu) or MIO(favMenu) then return end
+            if MIO(self) or MIO(button) or MIO(catMenu) or MIO(emoteMenu) or MIO(favMenu) or MIO(settingsMenu) then return end
             QEM:CloseAll()
         end)
         self:RegisterForEvent(EVENT_ACTION_LAYER_POPPED, function()
@@ -1190,6 +1369,7 @@ local function CreateUI()
         self:UnregisterForEvent(EVENT_GAME_CAMERA_UI_MODE_CHANGED)
         HideCatMenu()
         HideFavMenu()
+        HideSettingsMenu()
     end)
 
     ----------------------------------------------------------------------
@@ -1480,11 +1660,11 @@ end
 -- Slash + Keybind
 ----------------------------------------------------------------------
 SLASH_COMMANDS[SLASH_COMMAND_PANEL] = function()
-    if LibAddonMenu2 then
-        LibAddonMenu2:OpenToPanel(ADDON_NAME .. "Panel")
-    else
-        d("[" .. ADDON_NAME .. "] LibAddonMenu-2.0 not found. Settings unavailable.")
-    end
+    QEM.OpenSettingsPanel()
+end
+
+SLASH_COMMANDS[SLASH_COMMAND_DETACH] = function()
+    QEM.ToggleDetachFromChat()
 end
 
 -- Keybind handler (bind in Controls → User Interface)

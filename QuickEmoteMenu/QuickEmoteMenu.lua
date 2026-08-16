@@ -384,6 +384,27 @@ local function CreateUI()
         bg:SetHidden(false)
     end
 
+    -- Auto-hide free-floating TLW with HUD (map, inventory, etc.).
+    -- Only active in DETACHED mode. In ATTACHED mode the fragment must not
+    -- be registered or it will re-show the empty TLW when the HUD returns
+    -- (e.g. after closing the map).
+    local buttonFragment = ZO_SimpleSceneFragment:New(tlw)
+    local buttonFragmentAdded = false
+
+    local function SetButtonFragmentEnabled(enabled)
+        if enabled and not buttonFragmentAdded then
+            SM:GetScene("hud"):AddFragment(buttonFragment)
+            SM:GetScene("hudui"):AddFragment(buttonFragment)
+            buttonFragmentAdded = true
+        elseif not enabled and buttonFragmentAdded then
+            SM:GetScene("hud"):RemoveFragment(buttonFragment)
+            SM:GetScene("hudui"):RemoveFragment(buttonFragment)
+            buttonFragmentAdded = false
+            -- Fragment removal can leave the control shown; force hide when attached.
+            tlw:SetHidden(true)
+        end
+    end
+
     local function ApplyButtonAttachment()
         tlw:ClearAnchors()
         button:ClearAnchors()
@@ -391,7 +412,9 @@ local function CreateUI()
 
         if not QEM.SV.detachButtonFromChat and ZO_ChatWindowOptions and chatHost then
 
-            -- Attached: reparent under chat host.
+            -- Attached: reparent under chat host. Drop HUD fragment so it
+            -- cannot re-show the empty TLW after map/inventory closes.
+            SetButtonFragmentEnabled(false)
             tlw:SetHidden(true)
 
             if ZO_ChatWindowOptions and chatHost then
@@ -406,6 +429,7 @@ local function CreateUI()
 
             -- Detached: free-floating, draggable button with its own frame.
             InitTLWChrome()
+            SetButtonFragmentEnabled(true)
             tlw:SetHidden(false)
 
             button:SetParent(tlw)
@@ -503,14 +527,6 @@ local function CreateUI()
             menu:SetAnchor(LEFT, anchorRow, RIGHT, SUBMENU_GAP, 0)
         end
     end
-
-    -- Auto-hide alongside other HUD elements (map, inventory, dialogues, etc.)
-    -- by tying the free-floating TLW to the same scenes the regular HUD uses.
-    -- Only relevant in detached mode -- in attached mode the button is a
-    -- genuine child of the chat window and already follows its visibility.
-    local buttonFragment = ZO_SimpleSceneFragment:New(tlw)
-    SM:GetScene("hud"):AddFragment(buttonFragment)
-    SM:GetScene("hudui"):AddFragment(buttonFragment)
 
     -- Only show the button while the mouse cursor (UI mode) is active,
     -- i.e. hide it again once back in normal gameplay/interaction mode.
@@ -1087,7 +1103,23 @@ local function CreateUI()
         local maxW = ROW_W
         local count = 0
 
-        -- 1. Attach / Detach Button
+        -- 1. Show Settings Panel (only if LibAddonMenu2 is available)
+        if LibAddonMenu2 then
+            local row = AcquireSettingsRow()
+            count = count + 1
+            row.label:SetText(STRINGS.SHOW_SETTINGS_PANEL)
+            row:SetHandler("OnMouseUp", function(self, btn, upInside)
+                if btn == BTN_LEFT and upInside then
+                    QEM:CloseAll()
+                    -- QEM.OpenSettingsPanel() -- This doesn't work! use the slash command
+                    SLASH_COMMANDS[SLASH_COMMAND_PANEL]()
+                end
+            end)
+            measure:SetText(STRINGS.SHOW_SETTINGS_PANEL)
+            maxW = mmax(maxW, measure:GetTextWidth() + ROW_LEFT_PAD + ROW_RIGHT_PAD + 8)
+        end
+
+        -- 2. Attach / Detach Button
         do
             local row = AcquireSettingsRow()
             count = count + 1
@@ -1103,22 +1135,6 @@ local function CreateUI()
                 end
             end)
             measure:SetText(text)
-            maxW = mmax(maxW, measure:GetTextWidth() + ROW_LEFT_PAD + ROW_RIGHT_PAD + 8)
-        end
-
-        -- 2. Show Settings Panel (only if LibAddonMenu2 is available)
-        if LibAddonMenu2 then
-            local row = AcquireSettingsRow()
-            count = count + 1
-            row.label:SetText(STRINGS.SHOW_SETTINGS_PANEL)
-            row:SetHandler("OnMouseUp", function(self, btn, upInside)
-                if btn == BTN_LEFT and upInside then
-                    QEM:CloseAll()
-                    -- QEM.OpenSettingsPanel() -- This doesn't work! use the slash command
-                    SLASH_COMMANDS[SLASH_COMMAND_PANEL]()
-                end
-            end)
-            measure:SetText(STRINGS.SHOW_SETTINGS_PANEL)
             maxW = mmax(maxW, measure:GetTextWidth() + ROW_LEFT_PAD + ROW_RIGHT_PAD + 8)
         end
 
@@ -1592,23 +1608,31 @@ local function CreateUI()
         end
     end
 
-    -- Force-close the temporary favorites window as soon as the HUD scenes
-    -- start hiding (map, inventory, dialogues, etc.). This is the reliable
-    -- way for popup windows — no fragment that can re-show them later.
-    local function ForceHideFavOnHudHide(oldState, newState)
+    -- Force-close popup menus/windows as soon as the HUD scenes start hiding
+    -- (map, inventory, dialogues, etc.). The main menu is only a child of the
+    -- button control — it is NOT a scene fragment — so when the detached TLW
+    -- is re-shown after the map closes the menu would still be open unless we
+    -- explicitly CloseAll here. Same for the standalone favorites window.
+    local function ForceHidePopupsOnHudHide(oldState, newState)
         if newState == SCENE_HIDING or newState == SCENE_HIDDEN then
+            if not mainMenu:IsHidden() then
+                QEM:CloseAll()
+            end
             if not favWindow:IsHidden() then
                 QEM:HideFavoritesWindow(false)
             end
         end
     end
-    SM:GetScene("hud"):RegisterCallback("StateChange", ForceHideFavOnHudHide)
-    SM:GetScene("hudui"):RegisterCallback("StateChange", ForceHideFavOnHudHide)
+    SM:GetScene("hud"):RegisterCallback("StateChange", ForceHidePopupsOnHudHide)
+    SM:GetScene("hudui"):RegisterCallback("StateChange", ForceHidePopupsOnHudHide)
 
     -- Extra safety for the world map specifically
     if WMS then -- WORLD_MAP_SCENE
         WMS:RegisterCallback("StateChange", function(oldState, newState)
             if newState == SCENE_SHOWING or newState == SCENE_SHOWN then
+                if not mainMenu:IsHidden() then
+                    QEM:CloseAll()
+                end
                 if not favWindow:IsHidden() then
                     QEM:HideFavoritesWindow(false)
                 end

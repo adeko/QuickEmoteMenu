@@ -38,6 +38,8 @@ local GetString                  = GetString
 local GetUIMousePosition         = GetUIMousePosition
 local GuiRoot                    = GuiRoot
 local ZO_ClearTable              = ZO_ClearTable
+local ZO_ChatWindow              = ZO_ChatWindow
+local ZO_ChatWindowOptions       = ZO_ChatWindowOptions
 local ZO_ObjectPool              = ZO_ObjectPool
 local ZO_SavedVars               = ZO_SavedVars
 local ZO_SimpleSceneFragment     = ZO_SimpleSceneFragment
@@ -57,10 +59,15 @@ local ROW_W                 = 50
 local ROW_H                 = 24
 local ALPHA_ON, ALPHA_OFF   = 1, 0.35
 local BG_ALPHA              = 0.85
+local BORDER_ALPHA          = 0      -- TODO: test hidden border
 local MAX_VISIBLE_ROWS      = 20     -- TODO: max rows before scrollbar
 local TLW_BUTTON_SIZE       = 36
+local CHAT_BUTTON_SIZE      = 32
+local CHAT_BUTTON_GAP       = 5  -- gap between the button and the chat window options button
 local TEXTURE_ARROW_SCALE   = 0.8
 local SUBMENU_GAP           = 13
+local DRAW_LEVEL_TLW        = 200
+local DRAW_LEVEL_FAV        = 202
 
 -- Emote-row layout
 local ROW_LEFT_PAD          = 4
@@ -126,6 +133,8 @@ local function CacheLocalizedStrings()
     STRINGS.OPTION_HOVER_TOOLTIP   = GetString(SI_QUICKEMOTEMENU_OPTION_HOVER_TOOLTIP)
     STRINGS.OPTION_UIMODE          = GetString(SI_QUICKEMOTEMENU_OPTION_UIMODE)
     STRINGS.OPTION_UIMODE_TOOLTIP  = GetString(SI_QUICKEMOTEMENU_OPTION_UIMODE_TOOLTIP)
+    STRINGS.OPTION_DETACH          = GetString(SI_QUICKEMOTEMENU_OPTION_DETACH)
+    STRINGS.OPTION_DETACH_TOOLTIP  = GetString(SI_QUICKEMOTEMENU_OPTION_DETACH_TOOLTIP)
     STRINGS.OPTION_CLOSE           = GetString(SI_QUICKEMOTEMENU_OPTION_CLOSE)
     STRINGS.OPTION_RESET           = GetString(SI_QUICKEMOTEMENU_OPTION_RESET)
     STRINGS.OPTION_DESCRIPTION     = GetString(SI_QUICKEMOTEMENU_OPTION_DESCRIPTION)
@@ -136,14 +145,15 @@ end
 ----------------------------------------------------------------------
 local function InitSettings()
     local defaults = {
-        buttonX             = nil,
-        buttonY             = nil,
-        favWindowX          = nil,
-        favWindowY          = nil,
-        submenuDelay        = 100,   -- 0 = only on click
-        closeOnPlay         = true,  -- leave UI mode after LMB play
-        showOnlyInUIMode    = false, -- only show the main button while the cursor is visible
-        favorites           = {},    -- list of emoteId
+        buttonX              = nil,
+        buttonY              = nil,
+        favWindowX           = nil,
+        favWindowY           = nil,
+        submenuDelay         = 100,   -- 0 = only on click
+        closeOnPlay          = true,  -- leave UI mode after LMB play
+        showOnlyInUIMode     = false, -- only show the main button while the cursor is visible
+        detachButtonFromChat = false, -- false = dock button next to the chat window options button; true = free-floating (draggable) button
+        favorites            = {},    -- list of emoteId
     }
 
     local SV = ZO_SavedVars:NewAccountWide(ADDON_NAME .. "_SV", SV_VERSION, "Settings", defaults)
@@ -193,11 +203,25 @@ local function InitSettings()
             default = defaults.showOnlyInUIMode,
         },
         {
+            type    = "checkbox",
+            name    = STRINGS.OPTION_DETACH,
+            tooltip = STRINGS.OPTION_DETACH_TOOLTIP,
+            getFunc = function() return SV.detachButtonFromChat end,
+            setFunc = function(v)
+                SV.detachButtonFromChat = v
+                if QEM.UpdateButtonAttachment then QEM.UpdateButtonAttachment() end
+            end,
+            default = defaults.detachButtonFromChat,
+        },
+        {
             type    = "button",
             name    = STRINGS.OPTION_RESET,
             func    = function()
                 SV.buttonX, SV.buttonY = nil, nil
-                if QEM.button then
+                -- TODO: check detachButtonFromChat is true and ask if not 
+                if QEM.UpdateButtonAttachment then
+                    QEM.UpdateButtonAttachment()
+                elseif QEM.button then
                     QEM.button:ClearAnchors()
                     QEM.button:SetAnchor(CENTER, GuiRoot, CENTER, 0, 0)
                 end
@@ -291,49 +315,104 @@ local function CreateUI()
         end
     end
 
-    -- Floating movable button (TopLevelWindow)
+    -- Floating movable button (TopLevelWindow) -- only used in DETACHED mode.
+    -- In ATTACHED mode the single clickable button is reparented under the
+    -- chat window host so it fades/hides with chat.
     local tlw = CreateTopLevelWindow(ADDON_NAME .. "_ButtonTLW")
-    tlw:SetDimensions(TLW_BUTTON_SIZE, TLW_BUTTON_SIZE)
-    tlw:SetMouseEnabled(true)
-    tlw:SetMovable(false)           -- engine auto-drag is hardwired to LMB, so we
-                                    -- drive dragging manually (right mouse only) below
-    tlw:SetClampedToScreen(true)
-    tlw:SetDrawTier(DT_HIGH)
-    tlw:SetDrawLayer(DL_OVERLAY)
-    tlw:SetDrawLevel(200)
+    tlw:SetHidden(true)
 
-    -- Background
-    local bg = CreateControl("$(parent)Bg", tlw, CT_BACKDROP)
-    bg:SetAnchorFill(tlw)
-    bg:SetCenterColor(0.12, 0.12, 0.15, 0.92)
-    bg:SetEdgeColor(0.40, 0.55, 0.70, 1)
-    bg:SetEdgeTexture(nil, 1, 1, 1.5, 0)
-    bg:SetMouseEnabled(false)            -- must be false so TLW receives drag
+    -- Optional thin host under the chat window so the button inherits chat
+    -- alpha/fade/hide like a native chat icon.
+    local chatHost
+    if ZO_ChatWindow then
+        chatHost = CreateControl(ADDON_NAME .. "_ChatHost", ZO_ChatWindow, CT_CONTROL)
+        chatHost:SetDimensions(CHAT_BUTTON_SIZE, CHAT_BUTTON_SIZE)
+        chatHost:SetAnchor(RIGHT, ZO_ChatWindowOptions, LEFT, -CHAT_BUTTON_GAP, 0)
+        chatHost:SetMouseEnabled(false)
+        chatHost:SetHidden(false)
+    end
 
-    -- Clickable button (engine handles normal / pressed / over textures)
-    local button = CreateControl("$(parent)Btn", tlw, CT_BUTTON)
-    button:SetAnchorFill(tlw)
+    -- One clickable button for both modes -- only parent/anchor/dimensions change.
+    local button = CreateControl(ADDON_NAME .. "_Btn", GuiRoot, CT_BUTTON)
+    -- button:SetAnchorFill(GuiRoot)
     button:SetMouseEnabled(true)
     button:EnableMouseButton(BTN_RIGHT, true)
     button:SetNormalTexture(TEX.EMOTES)
     button:SetPressedTexture(TEX.EMOTES_DOWN)
     button:SetMouseOverTexture(TEX.EMOTES_OVER)
     button:SetClickSound(SOUND_CLICK)
+    button:SetDimensions(0, 0) -- TODO: reset this when button is attached
+    button:SetHidden(true) -- TODO: reset this when button is attached
 
-    -- Position
-    tlw:ClearAnchors()
-    if sv.buttonX and sv.buttonY
-        and sv.buttonX > 0 and sv.buttonY > 0
-        and sv.buttonX < GuiRoot:GetWidth() - TLW_BUTTON_SIZE
-        and sv.buttonY < GuiRoot:GetHeight() - TLW_BUTTON_SIZE then
-        tlw:SetAnchor(TOPLEFT, GuiRoot, TOPLEFT, sv.buttonX, sv.buttonY)
-    else
-        tlw:SetAnchor(CENTER, GuiRoot, CENTER, 0, 0)
-        sv.buttonX, sv.buttonY = nil, nil
+    -- Background frame -- lazily created the first time the button is detached.
+    local tlwChromeInitialized = false
+    local function InitTLWChrome()
+        if tlwChromeInitialized then return end
+        tlwChromeInitialized = true
+
+        tlw:SetDimensions(TLW_BUTTON_SIZE, TLW_BUTTON_SIZE)
+        tlw:SetMouseEnabled(true)
+        tlw:SetMovable(false)           -- engine auto-drag is hardwired to LMB, so we
+                                        -- drive dragging manually (right mouse only) below
+        tlw:SetClampedToScreen(true)
+        tlw:SetDrawTier(DT_HIGH)
+        tlw:SetDrawLayer(DL_OVERLAY)
+        tlw:SetDrawLevel(DRAW_LEVEL_TLW)
+
+        local bg = CreateControl("$(parent)Bg", tlw, CT_BACKDROP)
+        bg:SetAnchorFill(tlw)
+        bg:SetCenterColor(0.12, 0.12, 0.15, 0.92)
+        bg:SetEdgeColor(0.40, 0.55, 0.70, 1)
+        bg:SetEdgeTexture(nil, 1, 1, 1.5, 0)
+        bg:SetMouseEnabled(false)            -- must be false so TLW receives drag
+        bg:SetHidden(false)
+
+        -- TODO: do we need this?
+        -- bg:ClearAnchors()
     end
 
+    local function ApplyButtonAttachment()
+        tlw:ClearAnchors()
+        button:ClearAnchors()
+        button:SetHidden(false)
+
+        if not QEM.SV.detachButtonFromChat and ZO_ChatWindowOptions and chatHost then
+
+            -- Attached: reparent under chat host.
+            tlw:SetHidden(true)
+
+            if ZO_ChatWindowOptions and chatHost then
+                button:SetDimensions(CHAT_BUTTON_SIZE, CHAT_BUTTON_SIZE)
+                button:SetParent(chatHost)
+                button:SetAnchorFill(chatHost)
+            end
+        else
+            button:SetDimensions(TLW_BUTTON_SIZE, TLW_BUTTON_SIZE)
+
+            -- Detached: free-floating, draggable button with its own frame.
+            InitTLWChrome()
+            tlw:SetHidden(false)
+
+            button:SetParent(tlw)
+            button:SetAnchorFill(tlw)
+
+            if sv.buttonX and sv.buttonY
+                and sv.buttonX > 0 and sv.buttonY > 0
+                and sv.buttonX < GuiRoot:GetWidth() - TLW_BUTTON_SIZE
+                and sv.buttonY < GuiRoot:GetHeight() - TLW_BUTTON_SIZE then
+                tlw:SetAnchor(TOPLEFT, GuiRoot, TOPLEFT, sv.buttonX, sv.buttonY)
+            else
+                tlw:SetAnchor(CENTER, GuiRoot, CENTER, 0, 0)
+                sv.buttonX, sv.buttonY = nil, nil
+            end
+        end
+    end
+    QEM.ApplyButtonAttachment = ApplyButtonAttachment
+    ApplyButtonAttachment()
+
     -- Manual right-mouse-button dragging (engine's built-in SetMovable drag
-    -- only responds to the left button, so we can't use it for this)
+    -- only responds to the left button, so we can't use it for this).
+    -- Only ever active in detached mode -- see StartDragging below.
     local DRAG_UPDATE_NAME = ADDON_NAME .. "_ButtonDrag"
     local isDragging = false
     local dragStartMouseX, dragStartMouseY, dragStartLeft, dragStartTop
@@ -347,6 +426,7 @@ local function CreateUI()
     end
 
     local function StartDragging()
+        if not QEM.SV.detachButtonFromChat then return end -- docked to chat, not movable
         if isDragging then return end -- already dragging?
         isDragging = true
         WM:SetMouseCursor(CURSOR_TYPE.DRAG)
@@ -383,12 +463,18 @@ local function CreateUI()
         end
     end)
 
-    QEM.button = tlw          -- store the TLW (for show/hide & position)
-    QEM.buttonClick = button
+    QEM.button = tlw          -- store the TLW (for show/hide & position when detached)
+    QEM.buttonClick = button  -- the actual visible/clickable control in either mode
+    QEM.UpdateButtonAttachment = function()
+        if QEM.ApplyButtonAttachment then QEM.ApplyButtonAttachment() end
+        if QEM.UpdateButtonCursorVisibility then QEM.UpdateButtonCursorVisibility() end
+    end
 
-    -- Anchor submenu to button depending on button position
+    -- Anchor submenu to button depending on button position. Uses `button`
+    -- (not `tlw`) since that's the control that's actually visible and
+    -- correctly positioned in both attached and detached mode.
     local function ShouldOpenSubmenusLeft()
-        local buttonCenterX = tlw:GetLeft() + tlw:GetWidth() / 2
+        local buttonCenterX = button:GetLeft() + button:GetWidth() / 2
         return buttonCenterX > (GuiRoot:GetWidth() / 2)
     end
 
@@ -404,7 +490,9 @@ local function CreateUI()
     end
 
     -- Auto-hide alongside other HUD elements (map, inventory, dialogues, etc.)
-    -- by tying the button to the same scenes the regular HUD uses.
+    -- by tying the free-floating TLW to the same scenes the regular HUD uses.
+    -- Only relevant in detached mode -- in attached mode the button is a
+    -- genuine child of the chat window and already follows its visibility.
     local buttonFragment = ZO_SimpleSceneFragment:New(tlw)
     SM:GetScene("hud"):AddFragment(buttonFragment)
     SM:GetScene("hudui"):AddFragment(buttonFragment)
@@ -412,11 +500,15 @@ local function CreateUI()
     -- Optional: only show the button while the mouse cursor (UI mode) is active,
     -- i.e. hide it again once back in normal gameplay/interaction mode.
     -- Uses alpha/mouse-enable instead of SetHidden so it doesn't fight with the
-    -- HUD scene fragment above, which already controls the button's hidden state.
+    -- HUD scene fragment (detached) or the chat window's own fade (attached).
     local function UpdateButtonCursorVisibility()
         local showButton = (not QEM.SV.showOnlyInUIMode) or IsGameCameraUIModeActive()
-        tlw:SetAlpha(showButton and 1 or 0)
-        tlw:SetMouseEnabled(showButton)
+        if QEM.SV.detachButtonFromChat then
+            tlw:SetAlpha(showButton and 1 or 0)
+            tlw:SetMouseEnabled(showButton)
+        else
+            -- button:SetAlpha(showButton and 1 or 0) -- TODO: any use?
+        end
         button:SetMouseEnabled(showButton)
     end
     QEM.UpdateButtonCursorVisibility = UpdateButtonCursorVisibility
@@ -1040,18 +1132,20 @@ local function CreateUI()
         HideFavMenu()
     end
 
-    -- Anchor main menu to button depending on button position
+    -- Anchor main menu to button depending on button position. Uses `button`
+    -- (not `tlw`) since that's the control that's actually visible and
+    -- correctly positioned in both attached and detached mode.
     local function AnchorMainMenuToButton()
         mainMenu:ClearAnchors()
-        local buttonCenterY = tlw:GetTop() + tlw:GetHeight() / 2
+        local buttonCenterY = button:GetTop() + button:GetHeight() / 2
         local screenCenterY = GuiRoot:GetHeight() / 2
 
         if buttonCenterY < screenCenterY then
             -- Button in upper half → open menu below it
-            mainMenu:SetAnchor(TOP, tlw, BOTTOM, 0, 4)
+            mainMenu:SetAnchor(TOP, button, BOTTOM, 0, 4)
         else
             -- Button in lower half → open menu above it
-            mainMenu:SetAnchor(BOTTOM, tlw, TOP, 0, -4)
+            mainMenu:SetAnchor(BOTTOM, button, TOP, 0, -4)
         end
     end
 
@@ -1117,7 +1211,7 @@ local function CreateUI()
     favWindow:SetClampedToScreen(true)
     favWindow:SetDrawTier(DT_HIGH)
     favWindow:SetDrawLayer(DL_OVERLAY)
-    favWindow:SetDrawLevel(202)
+    favWindow:SetDrawLevel(DRAW_LEVEL_FAV)
     favWindow:SetHidden(true)
     favWindow:SetInheritAlpha(false)
     favWindow:SetDimensions(ROW_W, FAV_WIN_HEADER_H + ROW_H)
@@ -1128,7 +1222,7 @@ local function CreateUI()
     favWinBg:SetAnchor(BOTTOMRIGHT, favWindow, BOTTOMRIGHT, 5, 5)
     favWinBg:SetCenterColor(12/255, 12/255, 12/255, BG_ALPHA)
     favWinBg:SetEdgeTexture(nil, 1, 1, 1, 0)
-    favWinBg:SetEdgeColor(70/255, 70/255, 70/255, 0) -- TODO: transparent
+    favWinBg:SetEdgeColor(70/255, 70/255, 70/255, BORDER_ALPHA) -- TODO: transparent
     favWinBg:SetInsets(-1, -1, 1, 1)
     favWinBg:SetExcludeFromResizeToFitExtents(true)
     favWinBg:SetMouseEnabled(false)
@@ -1144,7 +1238,7 @@ local function CreateUI()
     favWinHeaderBg:SetAnchorFill(favWinHeader)
     favWinHeaderBg:SetCenterColor(12/255, 12/255, 12/255, 0.35)
     favWinHeaderBg:SetEdgeTexture(nil, 1, 1, 0, 0)
-    favWinHeaderBg:SetEdgeColor(70 / 255, 70 / 255, 70 / 255, 0) -- TODO: transparent
+    favWinHeaderBg:SetEdgeColor(70 / 255, 70 / 255, 70 / 255, BORDER_ALPHA) -- TODO: transparent
     favWinHeaderBg:SetMouseEnabled(false)
 
     local favWinTitle = CreateControl("$(parent)Title", favWinHeader, CT_LABEL)
@@ -1158,14 +1252,22 @@ local function CreateUI()
     StyleLabel(favWinTitle, false)
     favWinTitle:SetMouseEnabled(false)
 
+    -- TODO: change cursor on window drag
+
     -- Drag only via the header so row clicks never move the window
+    favWinHeader:SetHandler("OnMouseEnter", function()
+        WM:SetMouseCursor(CURSOR_TYPE.DRAG)
+    end)
+    favWinHeader:SetHandler("OnMouseExit", function()
+        WM:SetMouseCursor(CURSOR_TYPE.DEFAULT)
+    end)
     favWinHeader:SetHandler("OnMouseDown", function(_, btn)
-        if btn == BTN_LEFT then
+        if btn == BTN_LEFT or btn == BTN_RIGHT then
             favWindow:StartMoving()
         end
     end)
     favWinHeader:SetHandler("OnMouseUp", function(_, btn)
-        if btn == BTN_LEFT then
+        if btn == BTN_LEFT or btn == BTN_RIGHT then
             favWindow:StopMovingOrResizing()
             QEM.SV.favWindowX = favWindow:GetLeft()
             QEM.SV.favWindowY = favWindow:GetTop()

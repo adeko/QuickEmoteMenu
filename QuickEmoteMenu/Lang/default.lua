@@ -9,6 +9,8 @@ local strings = {
     SI_QUICKEMOTEMENU_OPTION_UIMODE         = "Show button only in UI mode",
     SI_QUICKEMOTEMENU_OPTION_UIMODE_TOOLTIP =
     "Only show the main button while the mouse cursor is active (UI mode). It will hide again once you return to normal gameplay/interaction mode.",
+    SI_QUICKEMOTEMENU_OPTION_DETACH         = "OPTION_DETACH",
+    SI_QUICKEMOTEMENU_OPTION_DETACH_TOOLTIP = "DETACH_TOOLTIP",
     SI_QUICKEMOTEMENU_OPTION_CLOSE          = "Close menu after playing emote (left-click)",
     SI_QUICKEMOTEMENU_OPTION_RESET          = "Reset button position",
     SI_QUICKEMOTEMENU_OPTION_DESCRIPTION    = [[

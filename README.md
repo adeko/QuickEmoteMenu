@@ -9,6 +9,7 @@ An addon for [The Elder Scrolls Online](https://www.elderscrollsonline.com/).
 ## Features
 
 - Button attaches to the chat window by default (blends in, hides/fades with chat) — or detach it to a free-floating, draggable button
+- Standalone, movable Favorites window for quick access via its own keybind
 - Main menu with Categories, Favorites, and Settings
 - Categories and emotes are loaded directly from the game's assets
 - New emotes added by the game will automatically appear in the list
@@ -17,7 +18,6 @@ An addon for [The Elder Scrolls Online](https://www.elderscrollsonline.com/).
 - Scrollable lists for long categories / favorites
 - Left-click an emote to play it
 - Right-click an emote to add/remove from Favorites (favorites are highlighted)
-- Standalone, movable Favorites window for quick access via its own keybind
 - Optional auto-close after playing an emote
 - Configurable hover delay before submenus open (or open only on click)
 - Button auto-hides with other HUD elements (map, inventory, etc.)

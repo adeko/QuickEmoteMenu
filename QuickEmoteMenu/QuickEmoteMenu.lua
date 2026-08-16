@@ -81,7 +81,6 @@ local COLORS = {
 
 -- Font & text style
 local FONT_ROW      = "$(MEDIUM_FONT)|18|shadow"
--- optional
 local FONT_HEADER   = "$(BOLD_FONT)|18|soft-shadow-thick" -- TODO
 
 -- Textures
@@ -1104,18 +1103,22 @@ local function CreateUI()
     -- current favorites list, is scrollable, movable by its header, and is
     -- read-only (no right-click removal here — manage favorites from the
     -- main button's menu instead).
+    --
+    -- Layout matches the fav submenu: explicit width/height, no padding
+    -- inset that fights scroll anchors, same backdrop style as CreatePopup.
     ----------------------------------------------------------------------
-    local FAV_WIN_HEADER_H = 24
+    local FAV_WIN_HEADER_H = ROW_H
 
     local favWindow = CreateTopLevelWindow(ADDON_NAME .. "_FavWindow")
     favWindow:SetMouseEnabled(true)
-    favWindow:SetMovable(true)   -- required for StartMoving()/StopMovingOrResizing() below
+    favWindow:SetMovable(true) -- required for StartMoving()/StopMovingOrResizing()
     favWindow:SetClampedToScreen(true)
     favWindow:SetDrawTier(DT_HIGH)
     favWindow:SetDrawLayer(DL_OVERLAY)
-    favWindow:SetDrawLevel(190)
+    favWindow:SetDrawLevel(202)
     favWindow:SetHidden(true)
     favWindow:SetInheritAlpha(false)
+    favWindow:SetDimensions(ROW_W, FAV_WIN_HEADER_H + ROW_H)
 
     -- Same backdrop style as CreatePopup / fav submenu
     local favWinBg = CreateControl("$(parent)Bg", favWindow, CT_BACKDROP)
@@ -1123,13 +1126,13 @@ local function CreateUI()
     favWinBg:SetAnchor(BOTTOMRIGHT, favWindow, BOTTOMRIGHT, 5, 5)
     favWinBg:SetCenterColor(12/255, 12/255, 12/255, BG_ALPHA)
     favWinBg:SetEdgeTexture(nil, 1, 1, 1, 0)
-    favWinBg:SetEdgeColor(70/255, 70/255, 70/255, 1)
+    favWinBg:SetEdgeColor(70/255, 70/255, 70/255, 0) -- TODO: transparent
     favWinBg:SetInsets(-1, -1, 1, 1)
     favWinBg:SetExcludeFromResizeToFitExtents(true)
     favWinBg:SetMouseEnabled(false)
 
-    -- Header: drag handle + title + close button (palette matched to fav submenu)
-    local favWinHeader = CreateControl("$(parent)Header", favWindow, CT_BUTTON)
+    -- Header: full-width drag handle + centered title
+    local favWinHeader = CreateControl("$(parent)Header", favWindow, CT_CONTROL)
     favWinHeader:SetAnchor(TOPLEFT, favWindow, TOPLEFT, 0, 0)
     favWinHeader:SetAnchor(TOPRIGHT, favWindow, TOPRIGHT, 0, 0)
     favWinHeader:SetHeight(FAV_WIN_HEADER_H)
@@ -1137,9 +1140,9 @@ local function CreateUI()
 
     local favWinHeaderBg = CreateControl("$(parent)Bg", favWinHeader, CT_BACKDROP)
     favWinHeaderBg:SetAnchorFill(favWinHeader)
-    favWinHeaderBg:SetCenterColor(12/255, 12/255, 12/255, 0.5)
+    favWinHeaderBg:SetCenterColor(12/255, 12/255, 12/255, 0.35)
     favWinHeaderBg:SetEdgeTexture(nil, 1, 1, 0, 0)
-    favWinHeaderBg:SetEdgeColor(70/255, 70/255, 70/255, 1)
+    favWinHeaderBg:SetEdgeColor(70 / 255, 70 / 255, 70 / 255, 0) -- TODO: transparent
     favWinHeaderBg:SetMouseEnabled(false)
 
     local favWinTitle = CreateControl("$(parent)Title", favWinHeader, CT_LABEL)
@@ -1148,19 +1151,18 @@ local function CreateUI()
     favWinTitle:SetHorizontalAlignment(TEXT_ALIGN_CENTER)
     favWinTitle:SetMaxLineCount(1)
     favWinTitle:SetWrapMode(TEXT_WRAP_MODE_ELLIPSIS)
-    favWinTitle:SetFont(FONT_ROW)
+    favWinTitle:SetFont(FONT_HEADER)
     favWinTitle:SetText(STRINGS.FAVORITES)
     StyleLabel(favWinTitle, false)
     favWinTitle:SetMouseEnabled(false)
 
-    -- Drag only via the header (built-in TLW move, triggered manually so
-    -- clicking rows in the body below never moves the window)
-    favWinHeader:SetHandler("OnMouseDown", function(self, btn)
+    -- Drag only via the header so row clicks never move the window
+    favWinHeader:SetHandler("OnMouseDown", function(_, btn)
         if btn == BTN_LEFT then
             favWindow:StartMoving()
         end
     end)
-    favWinHeader:SetHandler("OnMouseUp", function(self, btn)
+    favWinHeader:SetHandler("OnMouseUp", function(_, btn)
         if btn == BTN_LEFT then
             favWindow:StopMovingOrResizing()
             QEM.SV.favWindowX = favWindow:GetLeft()
@@ -1168,9 +1170,9 @@ local function CreateUI()
         end
     end)
 
-    -- Scrollable body
+    -- Scrollable body — same pattern as favMenu / emoteMenu
     local favWinScroll = CreateControlFromVirtual("$(parent)Scroll", favWindow, "ZO_ScrollContainer")
-    favWinScroll:SetAnchor(TOPLEFT, favWinHeader, BOTTOMLEFT, 0, 0)
+    favWinScroll:SetAnchor(TOPLEFT, favWindow, TOPLEFT, 0, FAV_WIN_HEADER_H + 5)
     favWinScroll:SetAnchor(BOTTOMRIGHT, favWindow, BOTTOMRIGHT, 0, 0)
     ZO_Scroll_Initialize(favWinScroll)
     local favWinChild = favWinScroll:GetNamedChild("ScrollChild")
@@ -1197,8 +1199,7 @@ local function CreateUI()
         row:SetHandler("OnMouseEnter", function(self) StyleLabel(self.label, true) end)
         row:SetHandler("OnMouseExit",  function(self) StyleLabel(self.label, false) end)
 
-        -- Left-click plays the emote. No right-click handler on purpose —
-        -- this window is read-only; favorites are managed from the main menu.
+        -- Play only; no right-click unfavorite (manage favorites from main menu)
         row:SetHandler("OnMouseUp", function(self, btn, upInside)
             if not upInside or not self.data or not self.data.emoteIndex then return end
             if btn == BTN_LEFT then
@@ -1266,13 +1267,20 @@ local function CreateUI()
             end
         end
 
-        -- Header needs room for centered title text; never shrink below that
+        -- Never shrink below the centered title width
         measure:SetText(STRINGS.FAVORITES)
         local headerMinW = measure:GetTextWidth() + ROW_LEFT_PAD * 2
         local finalW = mmax(maxW, headerMinW, ROW_W)
-        favWindow:SetWidth(finalW)
+
+        local contentH = mmax(count * ROW_H, 1)
+        local visH     = mmin(mmax(count, 1), MAX_VISIBLE_ROWS) * ROW_H
+
+        -- Size window first, then children (same order as fav/emote submenus)
+        favWindow:SetDimensions(finalW, visH + FAV_WIN_HEADER_H)
         favWinScroll:SetWidth(finalW)
+        favWinScroll:SetHeight(visH)
         favWinChild:SetWidth(finalW)
+        favWinChild:SetHeight(contentH)
 
         for i = 1, count do
             local row = activeFavWinRows[i]
@@ -1285,12 +1293,6 @@ local function CreateUI()
                 row:SetAnchor(TOPLEFT, activeFavWinRows[i - 1], BOTTOMLEFT, 0, 0)
             end
         end
-
-        local contentH = mmax(count * ROW_H, 1)
-        local visH     = mmin(mmax(count, 1), MAX_VISIBLE_ROWS) * ROW_H
-        favWinChild:SetHeight(contentH)
-        favWinScroll:SetHeight(visH)
-        favWindow:SetHeight(visH + FAV_WIN_HEADER_H)
 
         if ZO_Scroll_UpdateScrollBar then ZO_Scroll_UpdateScrollBar(favWinScroll) end
         if ZO_Scroll_ResetToTop then ZO_Scroll_ResetToTop(favWinScroll) end
@@ -1331,7 +1333,7 @@ local function CreateUI()
         self:UnregisterForEvent(EVENT_GAME_CAMERA_UI_MODE_CHANGED)
     end)
 
-    -- Position (independent of the main button's saved position)
+    -- Position (independent of the main button)
     favWindow:ClearAnchors()
     if sv.favWindowX and sv.favWindowY
         and sv.favWindowX > 0 and sv.favWindowY > 0

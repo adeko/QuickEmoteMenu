@@ -8,9 +8,6 @@ local SV_VERSION    = 1
 local SLASH_COMMAND_PANEL  = "/qempanel"
 local SLASH_COMMAND_DETACH = "/qemdetach"
 
--- TODO: when true, the in-menu Settings entry is not shown on the main emote menu.
-local hideSettingsMenu = false
-
 QuickEmoteMenu = QuickEmoteMenu or {}
 local QEM = QuickEmoteMenu
 
@@ -18,6 +15,7 @@ local QEM = QuickEmoteMenu
 local SM  = SCENE_MANAGER
 local EM  = EVENT_MANAGER
 local WM  = WINDOW_MANAGER
+local WMS = WORLD_MAP_SCENE
 local PEM = PLAYER_EMOTE_MANAGER
 local MIO = MouseIsOver
 
@@ -63,7 +61,7 @@ local ROW_W                 = 50
 local ROW_H                 = 24
 local ALPHA_ON, ALPHA_OFF   = 1, 0.35
 local BG_ALPHA              = 0.85
-local BORDER_ALPHA          = 0      -- TODO: test hidden border
+local BORDER_ALPHA          = 0      -- TODO: testing hidden border
 local MAX_VISIBLE_ROWS      = 20     -- TODO: max rows before scrollbar
 local TLW_BUTTON_SIZE       = 36
 local CHAT_BUTTON_SIZE      = 32
@@ -72,6 +70,9 @@ local TEXTURE_ARROW_SCALE   = 0.8
 local SUBMENU_GAP           = 13
 local DRAW_LEVEL_TLW        = 200
 local DRAW_LEVEL_FAV        = 202
+
+-- TODO: when true, the in-menu Settings entry is not shown on the main emote menu.
+local hideSettingsMenu      = false
 
 -- Emote-row layout
 local ROW_LEFT_PAD          = 4
@@ -92,7 +93,7 @@ local COLORS = {
 
 -- Font & text style
 local FONT_ROW      = "$(MEDIUM_FONT)|18|shadow"
-local FONT_HEADER   = "$(BOLD_FONT)|18|soft-shadow-thick" -- TODO
+local FONT_HEADER   = "$(BOLD_FONT)|18|soft-shadow-thick"
 
 -- Textures
 local TEX = {
@@ -146,25 +147,6 @@ local function CacheLocalizedStrings()
     STRINGS.ATTACH_BUTTON          = GetString(SI_QUICKEMOTEMENU_OPTION_ATTACH_BUTTON)
     STRINGS.DETACH_BUTTON          = GetString(SI_QUICKEMOTEMENU_OPTION_DETACH_BUTTON)
     STRINGS.SHOW_SETTINGS_PANEL    = GetString(SI_QUICKEMOTEMENU_OPTION_SHOW_PANEL)
-end
-
-----------------------------------------------------------------------
--- Shared helpers (slash commands + in-menu Settings)
-----------------------------------------------------------------------
-function QEM.OpenSettingsPanel()
-    if LibAddonMenu2 then
-        LibAddonMenu2:OpenToPanel(ADDON_NAME .. "Panel")
-    else
-        d("[" .. ADDON_NAME .. "] LibAddonMenu-2.0 not found. Settings unavailable.")
-    end
-end
-
-function QEM.ToggleDetachFromChat()
-    if not QEM.SV then return end
-    QEM.SV.detachButtonFromChat = not QEM.SV.detachButtonFromChat
-    if QEM.UpdateButtonAttachment then
-        QEM.UpdateButtonAttachment()
-    end
 end
 
 ----------------------------------------------------------------------
@@ -245,10 +227,7 @@ local function InitSettings()
             name    = STRINGS.OPTION_RESET,
             func    = function()
                 SV.buttonX, SV.buttonY = nil, nil
-                -- TODO: check detachButtonFromChat is true and ask if not 
-                if QEM.UpdateButtonAttachment then
-                    QEM.UpdateButtonAttachment()
-                elseif QEM.button then
+                if SV.detachButtonFromChat and QEM.button then
                     QEM.button:ClearAnchors()
                     QEM.button:SetAnchor(CENTER, GuiRoot, CENTER, 0, 0)
                 end
@@ -306,7 +285,7 @@ local function CreateUI()
         end
     end
 
-    local function CreatePopup(name, parent)
+    local function AcquirePopup(name, parent)
         local menu = CreateControl(name, parent or GuiRoot, CT_CONTROL)
         menu:SetInheritAlpha(false)
         menu:SetMouseEnabled(true)
@@ -348,28 +327,38 @@ local function CreateUI()
     local tlw = CreateTopLevelWindow(ADDON_NAME .. "_ButtonTLW")
     tlw:SetHidden(true)
 
-    -- Optional thin host under the chat window so the button inherits chat
+    -- Thin host under the chat window so the button inherits chat
     -- alpha/fade/hide like a native chat icon.
     local chatHost
+    local function SetChatHostAnchorAndDimensions(isVisible)
+        if not chatHost then return end
+        if isVisible then
+            chatHost:SetAnchor(RIGHT, ZO_ChatWindowOptions, LEFT, -CHAT_BUTTON_GAP, 0)
+            chatHost:SetDimensions(CHAT_BUTTON_SIZE, CHAT_BUTTON_SIZE)
+        else
+            chatHost:SetAnchor(RIGHT, ZO_ChatWindowOptions, LEFT, 0, 0)
+            chatHost:SetDimensions(0, 0)
+        end
+    end
+    QEM.SetChatHostAnchorAndDimensions = SetChatHostAnchorAndDimensions
     if ZO_ChatWindow then
         chatHost = CreateControl(ADDON_NAME .. "_ChatHost", ZO_ChatWindow, CT_CONTROL)
-        chatHost:SetDimensions(CHAT_BUTTON_SIZE, CHAT_BUTTON_SIZE)
-        chatHost:SetAnchor(RIGHT, ZO_ChatWindowOptions, LEFT, -CHAT_BUTTON_GAP, 0)
+        QEM.SetChatHostAnchorAndDimensions(false);
         chatHost:SetMouseEnabled(false)
         chatHost:SetHidden(false)
     end
+    QEM.chatHost = chatHost
 
     -- One clickable button for both modes -- only parent/anchor/dimensions change.
     local button = CreateControl(ADDON_NAME .. "_Btn", GuiRoot, CT_BUTTON)
-    -- button:SetAnchorFill(GuiRoot)
     button:SetMouseEnabled(true)
     button:EnableMouseButton(BTN_RIGHT, true)
     button:SetNormalTexture(TEX.EMOTES)
     button:SetPressedTexture(TEX.EMOTES_DOWN)
     button:SetMouseOverTexture(TEX.EMOTES_OVER)
     button:SetClickSound(SOUND_CLICK)
-    button:SetDimensions(0, 0) -- TODO: reset this when button is attached
-    button:SetHidden(true) -- TODO: reset this when button is attached
+    button:SetDimensions(0, 0)
+    button:SetHidden(true)
 
     -- Background frame -- lazily created the first time the button is detached.
     local tlwChromeInitialized = false
@@ -393,9 +382,6 @@ local function CreateUI()
         bg:SetEdgeTexture(nil, 1, 1, 1.5, 0)
         bg:SetMouseEnabled(false)            -- must be false so TLW receives drag
         bg:SetHidden(false)
-
-        -- TODO: do we need this?
-        -- bg:ClearAnchors()
     end
 
     local function ApplyButtonAttachment()
@@ -409,11 +395,13 @@ local function CreateUI()
             tlw:SetHidden(true)
 
             if ZO_ChatWindowOptions and chatHost then
+                QEM.SetChatHostAnchorAndDimensions(true)
                 button:SetDimensions(CHAT_BUTTON_SIZE, CHAT_BUTTON_SIZE)
                 button:SetParent(chatHost)
                 button:SetAnchorFill(chatHost)
             end
         else
+            QEM.SetChatHostAnchorAndDimensions(false)
             button:SetDimensions(TLW_BUTTON_SIZE, TLW_BUTTON_SIZE)
 
             -- Detached: free-floating, draggable button with its own frame.
@@ -524,7 +512,7 @@ local function CreateUI()
     SM:GetScene("hud"):AddFragment(buttonFragment)
     SM:GetScene("hudui"):AddFragment(buttonFragment)
 
-    -- Optional: only show the button while the mouse cursor (UI mode) is active,
+    -- Only show the button while the mouse cursor (UI mode) is active,
     -- i.e. hide it again once back in normal gameplay/interaction mode.
     -- Uses alpha/mouse-enable instead of SetHidden so it doesn't fight with the
     -- HUD scene fragment (detached) or the chat window's own fade (attached).
@@ -544,16 +532,16 @@ local function CreateUI()
     UpdateButtonCursorVisibility()
 
     -- Main menu -------------------------------------------------------
-    local mainMenu = CreatePopup(ADDON_NAME .. "_Main", button)
+    local mainMenu = AcquirePopup(ADDON_NAME .. "_Main", button)
     mainMenu:SetAnchor(BOTTOM, button, TOP, 0, -4)
     QEM.mainMenu = mainMenu
 
     -- Category submenu ------------------------------------------------
-    local catMenu = CreatePopup(ADDON_NAME .. "_CatMenu", mainMenu.bg)
+    local catMenu = AcquirePopup(ADDON_NAME .. "_CatMenu", mainMenu.bg)
     QEM.catMenu = catMenu
 
     -- Emote submenu ---------------------------------------------------
-    local emoteMenu = CreatePopup(ADDON_NAME .. "_EmoteMenu", catMenu.bg)
+    local emoteMenu = AcquirePopup(ADDON_NAME .. "_EmoteMenu", catMenu.bg)
     QEM.emoteMenu = emoteMenu
 
     local emoteScroll = CreateControlFromVirtual("$(parent)Scroll", emoteMenu, "ZO_ScrollContainer")
@@ -566,7 +554,7 @@ local function CreateUI()
     emoteMenu.scrollChild = emoteChild
 
     -- Favorites submenu ------------------------------------------------
-    local favMenu = CreatePopup(ADDON_NAME .. "_FavMenu", mainMenu.bg)
+    local favMenu = AcquirePopup(ADDON_NAME .. "_FavMenu", mainMenu.bg)
     QEM.favMenu = favMenu
 
     local favScroll = CreateControlFromVirtual("$(parent)Scroll", favMenu, "ZO_ScrollContainer")
@@ -579,7 +567,7 @@ local function CreateUI()
     favMenu.scrollChild = favChild
 
     -- Settings submenu (Attach/Detach + open LAM panel) ----------------
-    local settingsMenu = CreatePopup(ADDON_NAME .. "_SettingsMenu", mainMenu.bg)
+    local settingsMenu = AcquirePopup(ADDON_NAME .. "_SettingsMenu", mainMenu.bg)
     QEM.settingsMenu = settingsMenu
 
     local settingsRows = {}
@@ -603,7 +591,7 @@ local function CreateUI()
     end
 
     -- Row pool for emotes
-    local function CreateEmoteRow(pool)
+    local function AcquireEmoteRow(pool)
         local id = pool:GetNextControlId()
         local row = CreateControl("$(parent)ERow" .. id, emoteChild, CT_BUTTON)
         row:SetMouseEnabled(true)
@@ -667,10 +655,10 @@ local function CreateUI()
         c.data = nil
     end
 
-    emoteMenu.rowPool = ZO_ObjectPool:New(CreateEmoteRow, ResetEmoteRow)
+    emoteMenu.rowPool = ZO_ObjectPool:New(AcquireEmoteRow, ResetEmoteRow)
 
     -- Row pool for favorites submenu (play / unfavorite)
-    local function CreateFavListRow(pool)
+    local function AcquireFavListRow(pool)
         local id = pool:GetNextControlId()
         local row = CreateControl("$(parent)FRow" .. id, favChild, CT_BUTTON)
         row:SetMouseEnabled(true)
@@ -714,7 +702,7 @@ local function CreateUI()
         c.data = nil
     end
 
-    favMenu.rowPool = ZO_ObjectPool:New(CreateFavListRow, ResetFavListRow)
+    favMenu.rowPool = ZO_ObjectPool:New(AcquireFavListRow, ResetFavListRow)
 
     -- Helpers to show/hide submenus -----------------------------------
     local function HideEmoteMenu()
@@ -1014,7 +1002,7 @@ local function CreateUI()
         ZO_ClearTable(mainRows)
     end
 
-    local function CreateMainRow()
+    local function AcquireMainRow()
         local idx = #mainRows + 1
         local row = mainMenu["row" .. idx]
         if not row then
@@ -1073,7 +1061,7 @@ local function CreateUI()
         end
         ZO_ClearTable(settingsRows)
 
-        local function CreateSettingsRow()
+        local function AcquireSettingsRow()
             local idx = #settingsRows + 1
             local row = settingsMenu["srow" .. idx]
             if not row then
@@ -1101,7 +1089,7 @@ local function CreateUI()
 
         -- 1. Attach / Detach Button
         do
-            local row = CreateSettingsRow()
+            local row = AcquireSettingsRow()
             count = count + 1
             local text = QEM.SV.detachButtonFromChat and STRINGS.ATTACH_BUTTON or STRINGS.DETACH_BUTTON
             row.label:SetText(text)
@@ -1120,7 +1108,7 @@ local function CreateUI()
 
         -- 2. Show Settings Panel (only if LibAddonMenu2 is available)
         if LibAddonMenu2 then
-            local row = CreateSettingsRow()
+            local row = AcquireSettingsRow()
             count = count + 1
             row.label:SetText(STRINGS.SHOW_SETTINGS_PANEL)
             row:SetHandler("OnMouseUp", function(self, btn, upInside)
@@ -1178,7 +1166,7 @@ local function CreateUI()
 
         -- Categories (same look as category list rows)
         do
-            local row = CreateMainRow()
+            local row = AcquireMainRow()
             count = count + 1
             row.label:SetText(STRINGS.CATEGORIES)
             -- row.arrow:SetHidden(false)
@@ -1215,7 +1203,7 @@ local function CreateUI()
 
         -- Favorites (same look as category list rows)
         do
-            local row = CreateMainRow()
+            local row = AcquireMainRow()
             count = count + 1
             row.label:SetText(STRINGS.FAVORITES)
             -- row.arrow:SetHidden(false)
@@ -1252,7 +1240,7 @@ local function CreateUI()
 
         -- Settings (same look; optional via hideSettingsMenu)
         if not hideSettingsMenu then
-            local row = CreateMainRow()
+            local row = AcquireMainRow()
             count = count + 1
             row.label:SetText(STRINGS.SETTINGS)
             row.arrow:SetAlpha(keepSettingsSelected and ALPHA_ON or ALPHA_OFF)
@@ -1380,9 +1368,9 @@ local function CreateUI()
     -- main button's menu instead).
     --
     -- Layout matches the fav submenu: explicit width/height, no padding
-    -- inset that fights scroll anchors, same backdrop style as CreatePopup.
+    -- inset that fights scroll anchors, same backdrop style as AcquirePopup.
     ----------------------------------------------------------------------
-    local FAV_WIN_HEADER_MARGIN = 5
+    local FAV_WIN_HEADER_MARGIN = 5 -- extra space between header and content
     local FAV_WIN_HEADER_H = ROW_H + FAV_WIN_HEADER_MARGIN
 
     local favWindow = CreateTopLevelWindow(ADDON_NAME .. "_FavWindow")
@@ -1396,7 +1384,7 @@ local function CreateUI()
     favWindow:SetInheritAlpha(false)
     favWindow:SetDimensions(ROW_W, FAV_WIN_HEADER_H + ROW_H)
 
-    -- Same backdrop style as CreatePopup / fav submenu
+    -- Same backdrop style as AcquirePopup / fav submenu
     local favWinBg = CreateControl("$(parent)Bg", favWindow, CT_BACKDROP)
     favWinBg:SetAnchor(TOPLEFT, favWindow, TOPLEFT, -5, -5)
     favWinBg:SetAnchor(BOTTOMRIGHT, favWindow, BOTTOMRIGHT, 5, 5)
@@ -1432,8 +1420,6 @@ local function CreateUI()
     StyleLabel(favWinTitle, false)
     favWinTitle:SetMouseEnabled(false)
 
-    -- TODO: change cursor on window drag
-
     -- Drag only via the header so row clicks never move the window
     favWinHeader:SetHandler("OnMouseEnter", function()
         WM:SetMouseCursor(CURSOR_TYPE.DRAG)
@@ -1464,7 +1450,7 @@ local function CreateUI()
 
     local activeFavWinRows = {}
 
-    local function CreateFavWindowRow(pool)
+    local function AcquireFavWindowRow(pool)
         local id = pool:GetNextControlId()
         local row = CreateControl("$(parent)WRow" .. id, favWinChild, CT_BUTTON)
         row:SetMouseEnabled(true)
@@ -1502,7 +1488,7 @@ local function CreateUI()
         c.data = nil
     end
 
-    favWindow.rowPool = ZO_ObjectPool:New(CreateFavWindowRow, ResetFavWindowRow)
+    favWindow.rowPool = ZO_ObjectPool:New(AcquireFavWindowRow, ResetFavWindowRow)
 
     function QEM:RefreshFavoritesWindow()
         favWindow.rowPool:ReleaseAllObjects()
@@ -1620,8 +1606,8 @@ local function CreateUI()
     SM:GetScene("hudui"):RegisterCallback("StateChange", ForceHideFavOnHudHide)
 
     -- Extra safety for the world map specifically
-    if WORLD_MAP_SCENE then
-        WORLD_MAP_SCENE:RegisterCallback("StateChange", function(oldState, newState)
+    if WMS then -- WORLD_MAP_SCENE
+        WMS:RegisterCallback("StateChange", function(oldState, newState)
             if newState == SCENE_SHOWING or newState == SCENE_SHOWN then
                 if not favWindow:IsHidden() then
                     QEM:HideFavoritesWindow(false)
@@ -1654,6 +1640,25 @@ local function CreateUI()
     end
 
     QEM.favWindow = favWindow
+end
+
+----------------------------------------------------------------------
+-- Shared helpers (slash commands + in-menu Settings)
+----------------------------------------------------------------------
+function QEM.OpenSettingsPanel()
+    if LibAddonMenu2 then
+        LibAddonMenu2:OpenToPanel(ADDON_NAME .. "Panel")
+    else
+        d("[" .. ADDON_NAME .. "] LibAddonMenu-2.0 not found. Settings unavailable.")
+    end
+end
+
+function QEM.ToggleDetachFromChat()
+    if not QEM.SV then return end
+    QEM.SV.detachButtonFromChat = not QEM.SV.detachButtonFromChat
+    if QEM.UpdateButtonAttachment then
+        QEM.UpdateButtonAttachment()
+    end
 end
 
 ----------------------------------------------------------------------

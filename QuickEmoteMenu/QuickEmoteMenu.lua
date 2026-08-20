@@ -870,7 +870,7 @@ local function CreateUI()
 
         if emoteIds then
             for _, emoteId in ipairs(emoteIds) do
-                local info = PEM:GetEmoteItemInfo(emoteId) 
+                local info = PEM:GetEmoteItemInfo(emoteId)
                 if info and info.emoteIndex then
                     local slash = info.emoteSlashName or ""
                     if slash ~= "" and not seenSlash[slash] then
@@ -1688,14 +1688,6 @@ end
 ----------------------------------------------------------------------
 -- Slash + Keybind
 ----------------------------------------------------------------------
-SLASH_COMMANDS[SLASH_COMMAND_PANEL] = function()
-    QEM.OpenSettingsPanel()
-end
-
-SLASH_COMMANDS[SLASH_COMMAND_DETACH] = function()
-    QEM.ToggleDetachFromChat()
-end
-
 -- Keybind handler (bind in Controls → User Interface)
 function QEM_Toggle()
     if QEM.ToggleMainMenu then QEM:ToggleMainMenu(true) end
@@ -1723,6 +1715,14 @@ local function OnLoaded(_, name)
     -- Init
     InitSettings()
     CreateUI()
+
+    -- Slash
+    SLASH_COMMANDS[SLASH_COMMAND_PANEL] = function()
+        QEM.OpenSettingsPanel()
+    end
+    SLASH_COMMANDS[SLASH_COMMAND_DETACH] = function()
+        QEM.ToggleDetachFromChat()
+    end
 end
 
 EM:RegisterForEvent(ADDON_NAME, EVENT_ADD_ON_LOADED, OnLoaded)

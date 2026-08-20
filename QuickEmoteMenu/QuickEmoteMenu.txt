@@ -4,7 +4,7 @@
 ## Version: __BUILD_VERSION__
 ## AddOnVersion: __UNIX_TIMESTAMP__
 ## APIVersion: 101050
-## OptionalDependsOn: LibAddonMenu-2.0>=43
+## OptionalDependsOn: LibAddonMenu-2.0
 ## SavedVariables: QuickEmoteMenu_SV
 
 Lang/default.lua
@@ -13,8 +13,8 @@ Lang/$(language).lua
 QuickEmoteMenu.lua
 Bindings.xml
 
-# This Add-on is not created by, affiliated with, or sponsored by, 
-# ZeniMax Media Inc. or its affiliates. 
-# The Elder Scrolls® and related logos are registered trademarks or 
-# trademarks of ZeniMax Media Inc. in the United States and/or other 
+# This Add-on is not created by, affiliated with, or sponsored by,
+# ZeniMax Media Inc. or its affiliates.
+# The Elder Scrolls® and related logos are registered trademarks or
+# trademarks of ZeniMax Media Inc. in the United States and/or other
 # countries. All rights reserved.

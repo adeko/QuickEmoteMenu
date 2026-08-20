@@ -1111,8 +1111,10 @@ local function CreateUI()
             row:SetHandler("OnMouseUp", function(self, btn, upInside)
                 if btn == BTN_LEFT and upInside then
                     QEM:CloseAll()
-                    -- QEM.OpenSettingsPanel() -- This doesn't work! use the slash command
-                    SLASH_COMMANDS[SLASH_COMMAND_PANEL]()
+                    local cmd = SLASH_COMMANDS[SLASH_COMMAND_PANEL]
+                    if cmd then
+                        cmd()
+                    end
                 end
             end)
             measure:SetText(STRINGS.SHOW_SETTINGS_PANEL)
@@ -1669,14 +1671,6 @@ end
 ----------------------------------------------------------------------
 -- Shared helpers (slash commands + in-menu Settings)
 ----------------------------------------------------------------------
-function QEM.OpenSettingsPanel()
-    if LibAddonMenu2 then
-        LibAddonMenu2:OpenToPanel(ADDON_NAME .. "Panel")
-    else
-        d("[" .. ADDON_NAME .. "] LibAddonMenu-2.0 not found. Settings unavailable.")
-    end
-end
-
 function QEM.ToggleDetachFromChat()
     if not QEM.SV then return end
     QEM.SV.detachButtonFromChat = not QEM.SV.detachButtonFromChat
@@ -1717,9 +1711,6 @@ local function OnLoaded(_, name)
     CreateUI()
 
     -- Slash
-    SLASH_COMMANDS[SLASH_COMMAND_PANEL] = function()
-        QEM.OpenSettingsPanel()
-    end
     SLASH_COMMANDS[SLASH_COMMAND_DETACH] = function()
         QEM.ToggleDetachFromChat()
     end
